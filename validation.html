@@ -54,6 +54,16 @@
 
   <section class="grid">
     <div class="card">
+      <h2>0. Meta AI 앱에 바로 넣을 HTTPS URL</h2>
+      <p>Meta Display는 웹 서핑 앱이 없으므로, 아래 HTTPS 주소를 Meta AI 앱의 URL 입력에 넣어 글래스에서 엽니다.</p>
+      <label>YouTube 즉시 테스트</label>
+      <div class="status mono" id="shortYoutubeUrl"></div>
+      <label>빈 Display 런처</label>
+      <div class="status mono" id="shortDisplayUrl"></div>
+      <p>CHZZK Live는 실제 라이브 URL이 필요하므로 아래 “CHZZK Live 테스트 URL”에 넣은 뒤 생성되는 Display launch URL을 Meta AI 앱에 입력합니다.</p>
+    </div>
+
+    <div class="card">
       <h2>1. 테스트 URL 만들기</h2>
       <label for="youtubeUrl">YouTube 테스트 URL</label>
       <input id="youtubeUrl" value="https://www.youtube.com/watch?v=aqz-KE-bpKQ" />
@@ -118,6 +128,7 @@
   const resultKey = 'meta-display-remote-iphone:validation:v1';
   const $ = (id) => document.getElementById(id);
   const baseUrl = () => new URL('./index.html', location.href).href;
+  const shortUrl = (path) => new URL(path, location.href).href;
   const launchUrl = (raw) => {
     const url = new URL(baseUrl());
     url.searchParams.set('mode', 'display');
@@ -152,6 +163,8 @@
   }
   function boot() {
     $('selfQr').innerHTML = qr(location.href);
+    $('shortYoutubeUrl').textContent = shortUrl('./youtube.html');
+    $('shortDisplayUrl').textContent = shortUrl('./display.html');
     $('envStatus').innerHTML = `현재 페이지: <span class="mono">${location.href}</span>`;
     renderChecks();
     updatePreview();
