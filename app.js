@@ -100,7 +100,19 @@ function parseProvider(raw) {
 
 function youtubeEmbed(id) {
   if (!id) return null;
-  return `https://www.youtube.com/embed/${encodeURIComponent(id)}?autoplay=1&playsinline=1&rel=0&modestbranding=1`;
+  const params = new URLSearchParams({
+    autoplay: '1',
+    playsinline: '1',
+    rel: '0',
+    modestbranding: '1',
+    controls: '0',
+    disablekb: '1',
+    fs: '0',
+    iv_load_policy: '3',
+    enablejsapi: '1',
+    origin: window.location.origin,
+  });
+  return `https://www.youtube.com/embed/${encodeURIComponent(id)}?${params.toString()}`;
 }
 
 function chzzkCandidateEmbed(url, kind, id) {
@@ -157,6 +169,14 @@ function cleanupChzzkDirectPlayback() {
   abortChzzkDirectRequest();
   disposeHls();
   stopCurrentVideoElement();
+}
+
+function sendYouTubeCommand(func) {
+  const iframe = $('youtubeFrame');
+  if (!iframe?.contentWindow) return false;
+  iframe.dataset.lastCommand = func;
+  iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args: [] }), 'https://www.youtube.com');
+  return true;
 }
 
 function formatMbps(bandwidth) {
@@ -388,6 +408,7 @@ function playYouTubeTheater(parsed) {
   const frame = $('playerFrame');
   frame.innerHTML = '';
   const iframe = document.createElement('iframe');
+  iframe.id = 'youtubeFrame';
   iframe.className = 'youtube-frame';
   iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen';
   iframe.allowFullscreen = true;
@@ -460,7 +481,7 @@ async function playChzzkDirect(parsed) {
         <button id="chzzkOfficialBtn" type="button">공식 페이지</button>
       </div>
     `;
-    overlay.querySelector('#chzzkPlayBtn').addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); toggleCurrentVideo(); });
+    overlay.querySelector('#chzzkPlayBtn').addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); toggleCurrentMedia(); });
     overlay.querySelector('#chzzk480Btn').addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); switchChzzkQuality('480p'); });
     overlay.querySelector('#chzzk720Btn').addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); switchChzzkQuality('720p'); });
     overlay.querySelector('#chzzkOfficialBtn').addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); playChzzkOfficial(parsed); });
@@ -579,11 +600,16 @@ function handleRemote(action) {
   if (action === 'down') state.focusIndex = Math.min(state.items.length - 1, state.focusIndex + 1);
   if (action === 'enter') playUrl(state.items[state.focusIndex]?.url);
   if (action === 'back') resetPlayer();
-  if (action === 'playpause') toggleCurrentVideo();
+  if (action === 'playpause') toggleCurrentMedia();
   renderDisplayList();
 }
 
-function toggleCurrentVideo(force) {
+function toggleCurrentMedia(force) {
+  if (state.current?.provider === 'youtube') {
+    if (force === 'play') return sendYouTubeCommand('playVideo');
+    if (force === 'pause') return sendYouTubeCommand('pauseVideo');
+    return sendYouTubeCommand('pauseVideo');
+  }
   const video = $('chzzkVideo');
   if (!video) return false;
   if (force === 'pause' || (!force && !video.paused)) {
@@ -596,9 +622,9 @@ function toggleCurrentVideo(force) {
 
 function handleControl(action) {
   if (!action) return;
-  if (action === 'playpause') toggleCurrentVideo();
-  if (action === 'play') toggleCurrentVideo('play');
-  if (action === 'pause') toggleCurrentVideo('pause');
+  if (action === 'playpause') toggleCurrentMedia();
+  if (action === 'play') toggleCurrentMedia('play');
+  if (action === 'pause') toggleCurrentMedia('pause');
   if (action === 'back') resetPlayer();
   if (action === 'quality:480p' && state.current?.provider === 'chzzk') switchChzzkQuality('480p');
   if (action === 'quality:720p' && state.current?.provider === 'chzzk') switchChzzkQuality('720p');
