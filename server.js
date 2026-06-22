@@ -151,7 +151,7 @@ function serveStatic(req, res, url) {
     const ext = path.extname(filePath).toLowerCase();
     res.writeHead(200, {
       'content-type': MIME_TYPES[ext] || 'application/octet-stream',
-      'cache-control': 'no-cache',
+      'cache-control': 'no-store',
     });
     fs.createReadStream(filePath).pipe(res);
   });

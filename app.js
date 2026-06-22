@@ -264,7 +264,7 @@ async function sendUrlToDisplay(raw = $('urlInput').value.trim()) {
     });
     const result = await response.json();
     if (!response.ok || !result.ok) throw new Error(result.error || 'relay_failed');
-    showAnalysis(`${parsed.provider.toUpperCase()} 링크를 글래스로 보냈습니다. 연결된 Display: ${result.delivered}`);
+    showAnalysis(`${parsed.provider.toUpperCase()} 링크를 글래스로 보냈습니다. 연결된 Display: ${result.delivered}. 멈춰 있으면 글래스 화면 안의 재생 버튼을 눌러야 합니다.`);
   } catch {
     showAnalysis('Relay 전송 실패. Display launch URL을 복사해서 Meta AI 앱에 입력하세요.', true);
   }
