@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <title>Meta Display Remote iPhone · 실기기 검증</title>
+  <style>
+    :root { --bg:#05070c; --panel:#131824; --line:rgba(255,255,255,.12); --text:#f7f9ff; --muted:#96a1b8; --accent:#75f0ff; --ok:#8cffb8; --warn:#ffd36e; --bad:#ff7c9b; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:radial-gradient(circle at 10% 0%, #183057, transparent 32%), radial-gradient(circle at 100% 80%, #173a30, transparent 28%), var(--bg); color:var(--text); padding:18px; }
+    main { width:min(960px, 100%); margin:0 auto; display:grid; gap:16px; }
+    h1 { margin:0 0 8px; font-size:clamp(26px, 5vw, 42px); line-height:1.05; }
+    h2 { margin:0 0 12px; font-size:20px; }
+    p { color:var(--muted); line-height:1.55; }
+    a { color:var(--accent); }
+    .hero, .card { border:1px solid var(--line); background:rgba(19,24,36,.86); border-radius:24px; padding:18px; box-shadow:0 18px 80px rgba(0,0,0,.32); }
+    .hero { display:grid; grid-template-columns:1.2fr .8fr; gap:16px; align-items:center; }
+    .grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; }
+    .pill { display:inline-flex; border:1px solid rgba(117,240,255,.34); color:var(--accent); background:rgba(117,240,255,.08); border-radius:999px; padding:6px 10px; font-size:12px; font-weight:800; letter-spacing:.08em; }
+    label { display:block; color:var(--muted); font-size:13px; margin:10px 0 8px; }
+    input, textarea, select { width:100%; border:1px solid var(--line); background:rgba(0,0,0,.28); color:var(--text); border-radius:14px; padding:12px; font:inherit; }
+    textarea { min-height:90px; }
+    button, .button { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; border:1px solid var(--line); border-radius:14px; padding:11px 14px; background:rgba(255,255,255,.07); color:var(--text); text-decoration:none; font:inherit; cursor:pointer; }
+    button.primary, .button.primary { background:linear-gradient(135deg, rgba(117,240,255,.28), rgba(140,255,184,.18)); border-color:rgba(117,240,255,.45); }
+    .row { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+    .row > * { flex:1; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; word-break:break-all; }
+    .qr { width:180px; height:180px; border-radius:16px; background:white; display:grid; place-items:center; overflow:hidden; justify-self:center; }
+    .qr img { width:180px; height:180px; image-rendering:pixelated; }
+    .step { display:grid; grid-template-columns:auto 1fr; gap:10px; align-items:start; padding:10px 0; border-top:1px solid var(--line); }
+    .step:first-child { border-top:0; }
+    .num { width:28px; height:28px; border-radius:10px; display:grid; place-items:center; background:rgba(117,240,255,.13); color:var(--accent); font-weight:900; }
+    .check { display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center; padding:10px; border:1px solid var(--line); border-radius:14px; margin:8px 0; background:rgba(255,255,255,.035); }
+    .check input { width:20px; height:20px; }
+    .check select { width:auto; min-width:116px; }
+    .status { padding:10px 12px; border-radius:14px; background:rgba(255,255,255,.05); border:1px solid var(--line); }
+    .ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); }
+    @media (max-width:760px) { body { padding:10px; } .hero, .grid { grid-template-columns:1fr; } .qr { width:150px; height:150px; } .qr img { width:150px; height:150px; } .check { grid-template-columns:auto 1fr; } .check select { grid-column:2; width:100%; } }
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div>
+      <span class="pill">REAL DEVICE VALIDATION · 1차</span>
+      <h1>Meta Display Remote iPhone<br/>실기기 검증</h1>
+      <p>목표는 간단합니다. iPhone에서 고른 영상 URL이 MRBD/안경 브라우저에서 <strong>볼 만하게 열리는지</strong> 확인합니다. CHZZK는 클립 제외, Live만 봅니다.</p>
+      <div class="status" id="envStatus">환경 확인 중…</div>
+    </div>
+    <div class="qr" id="selfQr">QR</div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>1. 테스트 URL 만들기</h2>
+      <label for="youtubeUrl">YouTube 테스트 URL</label>
+      <input id="youtubeUrl" value="https://www.youtube.com/watch?v=aqz-KE-bpKQ" />
+      <label for="chzzkUrl">CHZZK Live 테스트 URL</label>
+      <input id="chzzkUrl" value="https://chzzk.naver.com/live/REPLACE_WITH_CHANNEL_ID" />
+      <div class="row">
+        <button class="primary" id="openYoutubeDisplay">YouTube Display 열기</button>
+        <button id="openChzzkDisplay">CHZZK Live Display 열기</button>
+      </div>
+      <div class="row">
+        <button id="openPhone">Phone Companion 열기</button>
+        <button id="copyReport">결과 JSON 복사</button>
+      </div>
+      <p class="mono" id="displayUrlPreview"></p>
+    </div>
+
+    <div class="card">
+      <h2>2. 실기기 진행 순서</h2>
+      <div class="step"><div class="num">1</div><div>iPhone에서 이 페이지 또는 Phone Companion을 연다.</div></div>
+      <div class="step"><div class="num">2</div><div>YouTube URL로 Display launch URL을 만든 뒤 MRBD/안경 브라우저에서 연다.</div></div>
+      <div class="step"><div class="num">3</div><div>영상 재생 버튼, 전체화면/화면비, 오디오 출력 위치를 확인한다.</div></div>
+      <div class="step"><div class="num">4</div><div>CHZZK Live URL로 같은 테스트를 한다. iframe이 애매하면 “전체 페이지” 버튼을 눌러 본다.</div></div>
+      <div class="step"><div class="num">5</div><div>아래 체크리스트를 저장/복사해서 다음 구현 여부를 판단한다.</div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>3. 체크리스트</h2>
+    <div id="checks"></div>
+    <label for="notes">메모</label>
+    <textarea id="notes" placeholder="예: YouTube는 재생되지만 오디오는 폰에서만 나옴. CHZZK는 로그인 화면까지만 진입."></textarea>
+  </section>
+
+  <section class="card">
+    <h2>4. 판정 기준</h2>
+    <p><strong class="ok">GO:</strong> YouTube가 MRBD에서 재생되고, CHZZK Live가 최소 공식 페이지/플레이어까지 진입한다. 이 경우 2번 실시간 리모컨 relay로 진행.</p>
+    <p><strong class="warn">PARTIAL:</strong> YouTube는 되지만 CHZZK Live가 로그인/정책/브라우저 문제로 막힌다. 이 경우 YouTube 중심 개인 앱으로 먼저 완성하고 CHZZK는 full-page fallback만 둔다.</p>
+    <p><strong class="bad">NO-GO:</strong> YouTube도 MRBD에서 재생이 불안정하거나 오디오/화면이 사용 불가 수준이다. 이 경우 앱 구현보다 MRBD 브라우저/미디어 제약을 먼저 확인한다.</p>
+  </section>
+</main>
+<script>
+  const checks = [
+    'MRBD/안경 브라우저에서 앱 URL이 열린다',
+    '600x600 화면에서 주요 UI가 잘리지 않는다',
+    'iPhone에서 YouTube launch URL을 만들 수 있다',
+    'MRBD/안경에서 YouTube iframe/player가 보인다',
+    'MRBD/안경에서 YouTube 영상이 실제 재생된다',
+    'YouTube 오디오 출력 위치를 확인했다',
+    'iPhone에서 CHZZK Live launch URL을 만들 수 있다',
+    'MRBD/안경에서 CHZZK Live 공식 페이지에 진입한다',
+    'CHZZK Live 플레이어 영역이 보인다',
+    'CHZZK Live 영상/오디오가 실제 재생된다',
+    'CHZZK Live가 안 될 때 전체 페이지 fallback이 동작한다',
+    '방향키/Enter/Esc 조작이 동작한다'
+  ];
+  const resultKey = 'meta-display-remote-iphone:validation:v1';
+  const $ = (id) => document.getElementById(id);
+  const baseUrl = () => new URL('./index.html', location.href).href;
+  const launchUrl = (raw) => {
+    const url = new URL(baseUrl());
+    url.searchParams.set('mode', 'display');
+    url.searchParams.set('play', raw);
+    return url.href;
+  };
+  const phoneUrl = () => {
+    const url = new URL(baseUrl());
+    url.searchParams.set('mode', 'phone');
+    return url.href;
+  };
+  function qr(target) {
+    return `<img alt="QR" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&data=${encodeURIComponent(target)}">`;
+  }
+  function renderChecks() {
+    const saved = JSON.parse(localStorage.getItem(resultKey) || '{}');
+    $('checks').innerHTML = checks.map((text, index) => {
+      const value = saved[`check_${index}`] || 'unknown';
+      const checked = value === 'pass' ? 'checked' : '';
+      return `<label class="check"><input type="checkbox" data-index="${index}" ${checked}><span>${text}</span><select data-select="${index}"><option value="unknown" ${value==='unknown'?'selected':''}>미확인</option><option value="pass" ${value==='pass'?'selected':''}>통과</option><option value="partial" ${value==='partial'?'selected':''}>부분</option><option value="fail" ${value==='fail'?'selected':''}>실패</option></select></label>`;
+    }).join('');
+    $('notes').value = saved.notes || '';
+  }
+  function save() {
+    const data = { at: new Date().toISOString(), page: location.href, youtubeUrl: $('youtubeUrl').value, chzzkUrl: $('chzzkUrl').value, notes: $('notes').value };
+    document.querySelectorAll('[data-select]').forEach((select) => data[`check_${select.dataset.select}`] = select.value);
+    localStorage.setItem(resultKey, JSON.stringify(data, null, 2));
+    return data;
+  }
+  function updatePreview() {
+    $('displayUrlPreview').textContent = launchUrl($('youtubeUrl').value);
+  }
+  function boot() {
+    $('selfQr').innerHTML = qr(location.href);
+    $('envStatus').innerHTML = `현재 페이지: <span class="mono">${location.href}</span>`;
+    renderChecks();
+    updatePreview();
+    $('youtubeUrl').addEventListener('input', updatePreview);
+    $('chzzkUrl').addEventListener('input', save);
+    $('notes').addEventListener('input', save);
+    document.addEventListener('change', (event) => {
+      if (event.target.matches('[data-index]')) {
+        const select = document.querySelector(`[data-select="${event.target.dataset.index}"]`);
+        select.value = event.target.checked ? 'pass' : 'unknown';
+      }
+      save();
+    });
+    $('openYoutubeDisplay').onclick = () => { save(); location.href = launchUrl($('youtubeUrl').value); };
+    $('openChzzkDisplay').onclick = () => { save(); location.href = launchUrl($('chzzkUrl').value); };
+    $('openPhone').onclick = () => { save(); location.href = phoneUrl(); };
+    $('copyReport').onclick = async () => {
+      const data = save();
+      const human = checks.map((text, i) => ({ item: text, result: data[`check_${i}`] || 'unknown' }));
+      await navigator.clipboard.writeText(JSON.stringify({ ...data, checks: human }, null, 2));
+      $('copyReport').textContent = '복사 완료';
+      setTimeout(() => $('copyReport').textContent = '결과 JSON 복사', 1400);
+    };
+  }
+  boot();
+</script>
+</body>
+</html>

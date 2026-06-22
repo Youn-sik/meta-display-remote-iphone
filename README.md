@@ -14,12 +14,22 @@
 
 CHZZK 클립/비디오는 1차 검증 범위에서 제외합니다. 우선 라이브만 봅니다.
 
+## 실기기 검증 시작점
+
+검증 페이지:
+
+- 로컬/LAN: `http://<Mac-LAN-IP>:5173/validation.html`
+- GitHub Pages 사용 시: `https://youn-sik.github.io/meta-display-remote-iphone/validation.html`
+
+`validation.html`에는 YouTube/CHZZK Live launch URL 생성, QR, 실기기 체크리스트, 결과 JSON 복사 기능이 있습니다.
+
 ## 사용 흐름
 
-1. `index.html?mode=phone`을 iPhone에서 엽니다.
+1. `validation.html` 또는 `index.html?mode=phone`을 iPhone에서 엽니다.
 2. YouTube 또는 CHZZK Live URL을 입력합니다.
 3. `Launch URL 복사` 또는 QR을 사용해 MRBD/안경 브라우저에서 엽니다.
 4. MRBD/안경에서는 600x600 화면에서 영상 또는 공식 페이지 fallback을 봅니다.
+5. `validation.html` 체크리스트에 실기기 결과를 기록합니다.
 
 ## 모드
 
