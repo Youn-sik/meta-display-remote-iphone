@@ -50,7 +50,7 @@ p { color: var(--muted); line-height: 1.42; }
 .now-playing { border: 1px solid var(--line); border-radius: 14px; padding: 10px; min-height: 42px; color: var(--text); background: rgba(0,0,0,0.22); font-size: 13px; line-height: 1.35; }
 .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
 .control-grid button:first-child { grid-column: span 2; }
-.primary-actions { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin-top: 10px; }
+.primary-actions { display: grid; grid-template-columns: 2fr 1.4fr 1fr; gap: 8px; margin-top: 10px; }
 .small-button { min-height: 34px; padding: 6px 10px; border-radius: 10px; font-size: 12px; flex: 0 0 auto; }
 .phone-grid { height: 100%; overflow: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-bottom: 4px; }
 .input-panel, .library-panel { grid-column: span 2; }
@@ -80,6 +80,7 @@ summary { cursor: pointer; font-weight: 800; color: var(--accent); }
 .app-shell.chzzk-theater .player-frame iframe { width: 100%; height: 100%; }
 .chzzk-direct { position: relative; width: 100%; height: 100%; background: #000; }
 .chzzk-video { width: 100%; height: 100%; display: block; background: #000; object-fit: contain; }
+.chzzk-video::-webkit-media-controls { display: none !important; }
 .chzzk-status { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-weight: 800; pointer-events: none; }
 .chzzk-status.hidden { display: none; }
 .chzzk-overlay { position: absolute; left: 10px; right: 10px; bottom: 10px; padding: 8px 10px; border-radius: 12px; background: rgba(0,0,0,0.58); border: 1px solid rgba(255,255,255,0.14); color: var(--text); font-size: 12px; display: grid; gap: 4px; }
@@ -97,6 +98,7 @@ summary { cursor: pointer; font-weight: 800; color: var(--accent); }
   .input-panel, .library-panel { grid-column: span 1; }
   .player-frame { height: 48vh; }
   .compact { max-height: 210px; }
+  .primary-actions { grid-template-columns: 1fr; }
 }
 @media (width: 600px) and (height: 600px) {
   body { padding: 0; }

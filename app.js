@@ -312,6 +312,19 @@ function openLaunch() {
   if ($('launchUrl').value) window.open($('launchUrl').value, '_blank', 'noopener');
 }
 
+function previewOnThisDevice() {
+  const raw = $('urlInput').value.trim();
+  const parsed = parseProvider(raw);
+  if (!parsed.url) return showAnalysis('유효한 URL을 넣은 뒤 이 기기에서 미리보기를 누르세요.', true);
+  const launch = makeLaunchUrl(parsed.url);
+  $('launchUrl').value = launch;
+  renderQr(launch);
+  upsertRecent({ title: parsed.title, url: parsed.url });
+  renderAll();
+  window.open(launch, '_blank', 'noopener');
+  showAnalysis('이 기기에서 Display와 동일한 재생 화면을 미리보기로 열었습니다. 여기서 이상 없을 때 글래스에 보내세요.');
+}
+
 async function sendUrlToDisplay(raw = $('urlInput').value.trim()) {
   const parsed = parseProvider(raw);
   if (!parsed.url) return showAnalysis('유효한 URL이 아닙니다.', true);
@@ -392,11 +405,13 @@ async function playChzzkDirect(parsed) {
   frame.innerHTML = `
     <div class="chzzk-direct">
       <div id="chzzkStatus" class="chzzk-status">CHZZK ${quality} HLS 직접 재생 준비 중…</div>
-      <video id="chzzkVideo" class="chzzk-video" controls autoplay playsinline></video>
+      <video id="chzzkVideo" class="chzzk-video" autoplay playsinline webkit-playsinline disablepictureinpicture></video>
       <div id="chzzkOverlay" class="chzzk-overlay"></div>
     </div>
   `;
   const video = $('chzzkVideo');
+  video.controls = false;
+  video.disablePictureInPicture = true;
   const overlay = $('chzzkOverlay');
   const status = $('chzzkStatus');
   const isCurrentRun = () => state.chzzkDirectRunId === runId;
@@ -423,11 +438,13 @@ async function playChzzkDirect(parsed) {
       <div><strong>${result.selected.quality}</strong> · ${result.selected.width}x${result.selected.height} · ${formatMbps(result.selected.bandwidth)}</div>
       <div>${result.title || parsed.title}</div>
       <div class="button-row chzzk-mini-buttons">
+        <button id="chzzkPlayBtn">재생/일시정지</button>
         <button id="chzzk480Btn">480p</button>
         <button id="chzzk720Btn">720p</button>
         <button id="chzzkOfficialBtn">공식 페이지</button>
       </div>
     `;
+    overlay.querySelector('#chzzkPlayBtn').addEventListener('click', () => toggleCurrentVideo());
     overlay.querySelector('#chzzk480Btn').addEventListener('click', () => switchChzzkQuality('480p'));
     overlay.querySelector('#chzzk720Btn').addEventListener('click', () => switchChzzkQuality('720p'));
     overlay.querySelector('#chzzkOfficialBtn').addEventListener('click', () => playChzzkOfficial(parsed));
@@ -435,15 +452,24 @@ async function playChzzkDirect(parsed) {
     if (window.Hls?.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: false,
-        maxBufferLength: 30,
-        backBufferLength: 30,
+        lowLatencyMode: true,
+        liveDurationInfinity: true,
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 8,
+        maxBufferLength: 12,
+        maxMaxBufferLength: 20,
+        backBufferLength: 0,
       });
       state.hls = hls;
       hls.loadSource(src);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => setStatus(`CHZZK ${result.selected.quality} 재생 시작 중…`, false));
-      hls.on(Hls.Events.LEVEL_LOADED, () => setStatus('', true));
+      hls.on(Hls.Events.LEVEL_LOADED, (_, data) => {
+        setStatus('', true);
+        if (data?.details?.live && Number.isFinite(hls.liveSyncPosition) && Math.abs(video.currentTime - hls.liveSyncPosition) > 8) {
+          video.currentTime = hls.liveSyncPosition;
+        }
+      });
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (!isCurrentRun()) return;
         if (data?.fatal) {
@@ -519,7 +545,7 @@ function showFallback(parsed, reason) {
 }
 
 function resetPlayer() {
-  disposeHls();
+  cleanupChzzkDirectPlayback();
   state.current = null;
   $('app').classList.remove('chzzk-theater');
   $('playerFrame').innerHTML = `
@@ -608,6 +634,7 @@ function bindEvents() {
   $('saveFavoriteBtn').addEventListener('click', () => saveFavorite($('urlInput').value));
   $('copyLaunchBtn').addEventListener('click', copyLaunch);
   $('openLaunchBtn').addEventListener('click', openLaunch);
+  $('previewDeviceBtn').addEventListener('click', previewOnThisDevice);
   document.querySelectorAll('[data-control]').forEach((button) => {
     button.addEventListener('click', () => sendControl(button.dataset.control));
   });
