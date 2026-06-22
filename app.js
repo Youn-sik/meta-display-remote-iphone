@@ -372,7 +372,7 @@ function playUrl(raw) {
   if (parsed.provider === 'chzzk') {
     setTheaterMode(true);
     $('app').classList.add('chzzk-theater');
-    playChzzkDirect720(parsed);
+    playChzzkDirect480(parsed);
     return;
   }
 
@@ -407,7 +407,7 @@ function playChzzkOfficial(parsed) {
   frame.appendChild(iframe);
 }
 
-async function playChzzkDirect720(parsed) {
+async function playChzzkDirect480(parsed) {
   cleanupEmbeddedPlayback();
   const runId = state.chzzkRunId;
   const controller = new AbortController();
@@ -416,8 +416,8 @@ async function playChzzkDirect720(parsed) {
   frame.innerHTML = `
     <div class="chzzk-direct">
       <video id="chzzkVideo" class="chzzk-video" autoplay playsinline webkit-playsinline disablepictureinpicture disableremoteplayback controlslist="nodownload nofullscreen noplaybackrate"></video>
-      <div id="chzzkStatus" class="chzzk-status">CHZZK 720p 불러오는 중…</div>
-      <div id="chzzkOverlay" class="chzzk-overlay">720p direct video</div>
+      <div id="chzzkStatus" class="chzzk-status">CHZZK 480p 불러오는 중…</div>
+      <div id="chzzkOverlay" class="chzzk-overlay">480p direct video</div>
     </div>
   `;
   const video = $('chzzkVideo');
@@ -431,7 +431,7 @@ async function playChzzkDirect720(parsed) {
     if (!isCurrentRun() || !overlay) return;
     const selected = stats.selected;
     const elapsed = (performance.now() - startedAt) / 1000;
-    overlay.textContent = `${message} · ${selected?.quality || '720p'} · ${selected?.width || '-'}x${selected?.height || '-'} · ${formatMbps(selected?.bandwidth)} · wait ${stats.waiting} · ${formatSeconds(elapsed)}`;
+    overlay.textContent = `${message} · ${selected?.quality || '480p'} · ${selected?.width || '-'}x${selected?.height || '-'} · ${formatMbps(selected?.bandwidth)} · wait ${stats.waiting} · ${formatSeconds(elapsed)}`;
   };
   const setStatus = (message, hidden = false) => {
     if (!isCurrentRun() || !status) return;
@@ -455,7 +455,7 @@ async function playChzzkDirect720(parsed) {
   video.addEventListener('error', () => { stats.errors += 1; setStatus('CHZZK video 오류', false); });
 
   try {
-    const response = await fetch(`/api/chzzk/live?channel=${encodeURIComponent(parsed.url)}&quality=720p&t=${Date.now()}`, {
+    const response = await fetch(`/api/chzzk/live?channel=${encodeURIComponent(parsed.url)}&quality=480p&t=${Date.now()}`, {
       cache: 'no-store',
       signal: controller.signal,
     });
@@ -499,7 +499,7 @@ async function playChzzkDirect720(parsed) {
     }
   } catch (error) {
     if (error.name === 'AbortError' || !isCurrentRun()) return;
-    setStatus(`CHZZK 720p direct 실패: ${error.message || 'unknown'}`, false);
+    setStatus(`CHZZK 480p direct 실패: ${error.message || 'unknown'}`, false);
   } finally {
     if (isCurrentRun()) state.chzzkAbortController = null;
   }

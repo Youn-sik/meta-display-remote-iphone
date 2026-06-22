@@ -105,3 +105,28 @@ summary { cursor: pointer; font-weight: 800; color: var(--accent); }
   body { padding: 0; }
   .app-shell { width: 600px; height: 600px; border-radius: 0; }
 }
+body.player-theater,
+body.player-theater .app-shell,
+body.player-theater .view,
+body.player-theater #displayView,
+body.player-theater .player-frame,
+body.player-theater .chzzk-direct,
+body.player-theater .chzzk-video {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  background: #000 !important;
+}
+body.player-theater .app-shell,
+body.player-theater #displayView,
+body.player-theater .player-frame,
+body.player-theater .chzzk-direct,
+body.player-theater .chzzk-video {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  min-height: 0 !important;
+}
