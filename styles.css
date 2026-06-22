@@ -80,6 +80,13 @@ summary { cursor: pointer; font-weight: 800; color: var(--accent); }
 .app-shell.player-theater #displayView { width: 100%; height: 100%; }
 .app-shell.player-theater .player-frame { width: 100%; height: 100%; border: 0; border-radius: 0; outline: 0; box-shadow: none; background: #000; }
 .app-shell.player-theater .player-frame iframe { width: 100%; height: 100%; border: 0; outline: 0; display: block; background: #000; }
+.chzzk-direct { position: relative; width: 100%; height: 100%; background: #000; }
+.chzzk-video { width: 100%; height: 100%; display: block; background: #000; object-fit: contain; user-select: none; -webkit-user-select: none; }
+.chzzk-video::-webkit-media-controls { display: none !important; }
+.chzzk-video::-webkit-media-controls-enclosure { display: none !important; }
+.chzzk-status { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-weight: 900; background: rgba(0,0,0,0.42); pointer-events: none; text-align: center; padding: 20px; }
+.chzzk-status.hidden { display: none; }
+.chzzk-overlay { position: absolute; left: 8px; right: 8px; bottom: 8px; padding: 7px 9px; border-radius: 10px; background: rgba(0,0,0,0.58); border: 1px solid rgba(255,255,255,0.14); color: var(--text); font-size: 11px; line-height: 1.25; pointer-events: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .error { color: var(--danger); }
 @media (max-width: 560px) {
   body { padding: 0; }

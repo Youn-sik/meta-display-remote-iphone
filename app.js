@@ -30,6 +30,10 @@ const state = {
   room: 'default',
   relayReady: false,
   lastRelayId: 0,
+  hls: null,
+  chzzkRunId: 0,
+  chzzkAbortController: null,
+  chzzkStats: null,
 };
 
 function getInitialRoom() {
@@ -120,7 +124,36 @@ function chzzkCandidateEmbed(url, kind, id) {
 }
 
 function cleanupEmbeddedPlayback() {
-  // CHZZK is rendered as the official webview. No direct HLS/video lifecycle remains.
+  state.chzzkRunId += 1;
+  if (state.chzzkAbortController) {
+    state.chzzkAbortController.abort();
+    state.chzzkAbortController = null;
+  }
+  if (state.hls) {
+    state.hls.destroy();
+    state.hls = null;
+  }
+  const video = $('chzzkVideo');
+  if (video) {
+    try {
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+    } catch {
+      // Best-effort cleanup for constrained browsers.
+    }
+  }
+  state.chzzkStats = null;
+}
+
+function formatSeconds(value) {
+  if (!Number.isFinite(value)) return '-';
+  return `${value.toFixed(1)}s`;
+}
+
+function formatMbps(bandwidth) {
+  if (!bandwidth) return '-';
+  return `${(bandwidth / 1_000_000).toFixed(2)} Mbps`;
 }
 
 function sendYouTubeCommand(func) {
@@ -339,7 +372,7 @@ function playUrl(raw) {
   if (parsed.provider === 'chzzk') {
     setTheaterMode(true);
     $('app').classList.add('chzzk-theater');
-    playChzzkOfficial(parsed);
+    playChzzkDirect720(parsed);
     return;
   }
 
@@ -372,6 +405,104 @@ function playChzzkOfficial(parsed) {
   iframe.referrerPolicy = 'strict-origin-when-cross-origin';
   iframe.src = parsed.embedUrl || parsed.url;
   frame.appendChild(iframe);
+}
+
+async function playChzzkDirect720(parsed) {
+  cleanupEmbeddedPlayback();
+  const runId = state.chzzkRunId;
+  const controller = new AbortController();
+  state.chzzkAbortController = controller;
+  const frame = $('playerFrame');
+  frame.innerHTML = `
+    <div class="chzzk-direct">
+      <video id="chzzkVideo" class="chzzk-video" autoplay playsinline webkit-playsinline disablepictureinpicture disableremoteplayback controlslist="nodownload nofullscreen noplaybackrate"></video>
+      <div id="chzzkStatus" class="chzzk-status">CHZZK 720p 불러오는 중…</div>
+      <div id="chzzkOverlay" class="chzzk-overlay">720p direct video</div>
+    </div>
+  `;
+  const video = $('chzzkVideo');
+  const status = $('chzzkStatus');
+  const overlay = $('chzzkOverlay');
+  const startedAt = performance.now();
+  const stats = { waiting: 0, stalled: 0, errors: 0, firstPlayingMs: null, selected: null };
+  state.chzzkStats = stats;
+  const isCurrentRun = () => state.chzzkRunId === runId;
+  const updateOverlay = (message) => {
+    if (!isCurrentRun() || !overlay) return;
+    const selected = stats.selected;
+    const elapsed = (performance.now() - startedAt) / 1000;
+    overlay.textContent = `${message} · ${selected?.quality || '720p'} · ${selected?.width || '-'}x${selected?.height || '-'} · ${formatMbps(selected?.bandwidth)} · wait ${stats.waiting} · ${formatSeconds(elapsed)}`;
+  };
+  const setStatus = (message, hidden = false) => {
+    if (!isCurrentRun() || !status) return;
+    status.textContent = message;
+    status.classList.toggle('hidden', hidden);
+    updateOverlay(message || '재생 중');
+  };
+
+  video.controls = false;
+  video.disablePictureInPicture = true;
+  video.disableRemotePlayback = true;
+  video.addEventListener('click', () => toggleCurrentMedia());
+  video.addEventListener('loadedmetadata', () => setStatus('메타데이터 로드됨', false));
+  video.addEventListener('canplay', () => setStatus(video.paused ? '화면을 눌러 재생하세요.' : '재생 가능', false));
+  video.addEventListener('playing', () => {
+    if (stats.firstPlayingMs == null) stats.firstPlayingMs = Math.round(performance.now() - startedAt);
+    setStatus('', true);
+  });
+  video.addEventListener('waiting', () => { stats.waiting += 1; setStatus('버퍼링 중…', false); });
+  video.addEventListener('stalled', () => { stats.stalled += 1; setStatus('네트워크 대기 중…', false); });
+  video.addEventListener('error', () => { stats.errors += 1; setStatus('CHZZK video 오류', false); });
+
+  try {
+    const response = await fetch(`/api/chzzk/live?channel=${encodeURIComponent(parsed.url)}&quality=720p&t=${Date.now()}`, {
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    const result = await response.json();
+    if (!isCurrentRun()) return;
+    if (!response.ok || !result.ok) throw new Error(result.error || 'chzzk_hls_failed');
+    stats.selected = result.selected;
+    updateOverlay('HLS 로드');
+    const src = result.selected.url;
+    if (window.Hls?.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: false,
+        liveDurationInfinity: true,
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 8,
+        maxBufferLength: 18,
+        maxMaxBufferLength: 30,
+        backBufferLength: 8,
+      });
+      state.hls = hls;
+      hls.loadSource(src);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        setStatus('재생 시작 중…', false);
+        video.play().catch(() => setStatus('화면을 눌러 재생하세요.', false));
+      });
+      hls.on(Hls.Events.LEVEL_LOADED, () => updateOverlay(video.paused ? '대기 중' : '재생 중'));
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (!isCurrentRun()) return;
+        if (data?.fatal) {
+          stats.errors += 1;
+          setStatus(`HLS 오류: ${data.details || data.type || 'unknown'}`, false);
+        }
+      });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = src;
+      video.play().catch(() => setStatus('화면을 눌러 재생하세요.', false));
+    } else {
+      throw new Error('hls_not_supported');
+    }
+  } catch (error) {
+    if (error.name === 'AbortError' || !isCurrentRun()) return;
+    setStatus(`CHZZK 720p direct 실패: ${error.message || 'unknown'}`, false);
+  } finally {
+    if (isCurrentRun()) state.chzzkAbortController = null;
+  }
 }
 
 function showFallback(parsed, reason) {
@@ -425,7 +556,20 @@ function toggleCurrentMedia(force) {
     if (force === 'pause') return sendYouTubeCommand('pauseVideo');
     return sendYouTubeCommand('pauseVideo');
   }
-  if (state.current?.provider === 'chzzk') return false;
+  if (state.current?.provider === 'chzzk') {
+    const video = $('chzzkVideo');
+    if (!video) return false;
+    if (force === 'play') {
+      video.play().catch(() => {});
+      return true;
+    }
+    if (force === 'pause' || (!force && !video.paused)) {
+      video.pause();
+      return true;
+    }
+    video.play().catch(() => {});
+    return true;
+  }
   return false;
 }
 
