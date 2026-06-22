@@ -238,6 +238,11 @@ function playRelayMessage(data) {
   playUrl(data.url);
 }
 
+function updateNowPlaying(text) {
+  const target = $('nowPlaying');
+  if (target) target.textContent = text || '아직 송출 중인 영상이 없습니다.';
+}
+
 function analyzeInput() {
   const raw = $('urlInput').value.trim();
   const parsed = parseProvider(raw);
@@ -275,6 +280,7 @@ async function sendUrlToDisplay(raw = $('urlInput').value.trim()) {
   const parsed = parseProvider(raw);
   if (!parsed.url) return showAnalysis('유효한 URL이 아닙니다.', true);
   upsertRecent({ title: parsed.title, url: parsed.url });
+  updateNowPlaying(`${parsed.title} · ${parsed.provider.toUpperCase()} ${parsed.kind.toUpperCase()}`);
   renderAll();
   const launch = makeLaunchUrl(parsed.url);
   $('launchUrl').value = launch;
@@ -299,6 +305,7 @@ function playUrl(raw) {
   if (!parsed.url) return;
   disposeHls();
   state.current = parsed;
+  updateNowPlaying(`${parsed.title} · ${parsed.provider.toUpperCase()} ${parsed.kind.toUpperCase()}`);
   upsertRecent({ title: parsed.title, url: parsed.url });
   setMode('display');
   $('app').classList.remove('chzzk-theater');
@@ -465,8 +472,48 @@ function handleRemote(action) {
   if (action === 'down') state.focusIndex = Math.min(state.items.length - 1, state.focusIndex + 1);
   if (action === 'enter') playUrl(state.items[state.focusIndex]?.url);
   if (action === 'back') resetPlayer();
-  if (action === 'playpause') window.postMessage({ type: 'noop' }, '*');
+  if (action === 'playpause') toggleCurrentVideo();
   renderDisplayList();
+}
+
+function toggleCurrentVideo(force) {
+  const video = $('chzzkVideo');
+  if (!video) return false;
+  if (force === 'pause' || (!force && !video.paused)) {
+    video.pause();
+    return true;
+  }
+  video.play().catch(() => {});
+  return true;
+}
+
+function handleControl(action) {
+  if (!action) return;
+  if (action === 'playpause') toggleCurrentVideo();
+  if (action === 'play') toggleCurrentVideo('play');
+  if (action === 'pause') toggleCurrentVideo('pause');
+  if (action === 'back') resetPlayer();
+  if (action === 'quality:480p' && state.current?.provider === 'chzzk') switchChzzkQuality(state.current.url, '480p');
+  if (action === 'quality:720p' && state.current?.provider === 'chzzk') switchChzzkQuality(state.current.url, '720p');
+  if (action === 'official' && state.current?.provider === 'chzzk') playChzzkOfficial(state.current);
+  if (action === 'direct' && state.current?.provider === 'chzzk') playChzzkDirect(state.current);
+}
+
+async function sendControl(action) {
+  channel?.postMessage({ type: 'control', action });
+  if (state.mode === 'display') handleControl(action);
+  try {
+    const response = await fetch('/api/control', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ room: state.room, action }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || 'control_failed');
+    showAnalysis(`제어 전송: ${action} · 연결된 Display ${result.delivered}`);
+  } catch {
+    showAnalysis('제어 전송 실패. Display가 같은 room으로 열려 있는지 확인하세요.', true);
+  }
 }
 
 function seedSamples() {
@@ -492,11 +539,14 @@ function bindEvents() {
   $('displayModeBtn').addEventListener('click', () => setMode('display'));
   $('phoneModeBtn').addEventListener('click', () => setMode('phone'));
   $('sampleBtn').addEventListener('click', seedSamples);
-  $('analyzeBtn').addEventListener('click', analyzeInput);
+  $('sampleBtnInline')?.addEventListener('click', seedSamples);
   $('sendDisplayBtn').addEventListener('click', () => sendUrlToDisplay());
   $('saveFavoriteBtn').addEventListener('click', () => saveFavorite($('urlInput').value));
   $('copyLaunchBtn').addEventListener('click', copyLaunch);
   $('openLaunchBtn').addEventListener('click', openLaunch);
+  document.querySelectorAll('[data-control]').forEach((button) => {
+    button.addEventListener('click', () => sendControl(button.dataset.control));
+  });
   document.querySelectorAll('[data-remote]').forEach((button) => {
     button.addEventListener('click', () => {
       const action = button.dataset.remote;
@@ -513,6 +563,7 @@ function bindEvents() {
   });
   channel?.addEventListener('message', (event) => {
     if (event.data?.type === 'remote' && state.mode === 'display') handleRemote(event.data.action);
+    if (event.data?.type === 'control' && state.mode === 'display') handleControl(event.data.action);
     if (event.data?.type === 'play' && state.mode === 'display') playUrl(event.data.url);
   });
 }
@@ -522,6 +573,9 @@ function connectRelay() {
     const events = new EventSource(`/api/events?room=${encodeURIComponent(state.room)}`);
     events.addEventListener('ready', () => setRelayState(`relay 연결됨 · room ${state.room}`, true));
     events.addEventListener('play', (event) => playRelayMessage(JSON.parse(event.data || '{}')));
+    events.addEventListener('control', (event) => {
+      if (state.mode === 'display') handleControl(JSON.parse(event.data || '{}').action);
+    });
     events.onerror = () => setRelayState(`relay 재연결 중 · room ${state.room}`, false);
   }
   window.setInterval(pollLatest, 1000);

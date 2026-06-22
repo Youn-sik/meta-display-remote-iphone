@@ -234,6 +234,26 @@ async function handleApi(req, res, url) {
     return true;
   }
 
+  if (req.method === 'POST' && url.pathname === '/api/control') {
+    try {
+      const raw = await readBody(req);
+      const payload = JSON.parse(raw || '{}');
+      const room = sanitizeRoom(payload.room);
+      const action = String(payload.action || '').trim();
+      const allowed = new Set(['playpause', 'play', 'pause', 'back', 'quality:480p', 'quality:720p', 'official', 'direct']);
+      if (!allowed.has(action)) {
+        sendJson(res, 400, { ok: false, error: 'invalid_action' });
+        return true;
+      }
+      const message = { id: nextMessageId++, action, room, at: new Date().toISOString() };
+      const delivered = broadcast(room, 'control', message);
+      sendJson(res, 200, { ok: true, room, delivered, message });
+    } catch (error) {
+      sendJson(res, 400, { ok: false, error: error.message || 'bad_request' });
+    }
+    return true;
+  }
+
   return false;
 }
 

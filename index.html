@@ -39,57 +39,51 @@
     </section>
 
     <section id="phoneView" class="view" aria-label="Phone companion">
-      <div class="phone-grid">
-        <div class="panel input-panel">
-          <label for="urlInput">영상 URL</label>
-          <textarea id="urlInput" placeholder="YouTube, youtu.be, chzzk.naver.com/live URL"></textarea>
-          <div class="button-row">
-            <button id="sendDisplayBtn" class="primary">글래스로 보내기</button>
-            <button id="analyzeBtn">분석</button>
-            <button id="saveFavoriteBtn">즐겨찾기 저장</button>
-          </div>
-          <div id="analysisBox" class="analysis-box muted">URL을 넣고 “글래스로 보내기”를 누르면 같은 room의 Display 화면에서 바로 열립니다. 영상이 멈춰 있으면 글래스 화면 안의 재생 버튼을 한 번 눌러야 합니다.</div>
-        </div>
-
-        <div class="panel launch-panel">
+      <div class="phone-stack">
+        <div class="panel now-panel">
           <div class="section-header">
-            <strong>Display 연결</strong>
+            <strong>송출 컨트롤</strong>
             <span id="relayState">relay 확인 중</span>
           </div>
-          <input id="launchUrl" readonly placeholder="분석 후 생성됩니다" />
-          <div class="button-row">
-            <button id="copyLaunchBtn" class="primary">Launch URL 복사</button>
-            <button id="openLaunchBtn">이 기기에서 미리보기</button>
+          <div id="nowPlaying" class="now-playing">아직 송출 중인 영상이 없습니다.</div>
+          <div class="control-grid">
+            <button data-control="playpause" class="primary">재생 / 일시정지</button>
+            <button data-control="back">송출 화면 닫기</button>
+            <button data-control="quality:480p">480p</button>
+            <button data-control="quality:720p">720p</button>
+            <button data-control="direct">저화질 직접 재생</button>
+            <button data-control="official">공식 페이지</button>
           </div>
-          <div id="qrBox" class="qr-box">QR</div>
-          <p class="hint">먼저 글래스에서 Display URL을 열어둔 뒤, 폰 Companion에서 링크를 보냅니다. 전송은 자동이지만, 브라우저 정책/네트워크 때문에 재생은 수동 시작이 필요할 수 있습니다.</p>
         </div>
 
-        <div class="panel remote-panel">
-          <div class="section-header">
-            <strong>리모컨 데모</strong>
-            <span>relay + 로컬 fallback</span>
+        <div class="panel input-panel">
+          <label for="urlInput">보낼 영상 URL</label>
+          <textarea id="urlInput" placeholder="YouTube 또는 chzzk.naver.com/live URL"></textarea>
+          <div class="primary-actions">
+            <button id="sendDisplayBtn" class="primary">글래스로 보내기</button>
+            <button id="saveFavoriteBtn">저장</button>
           </div>
-          <div class="remote-pad">
-            <button data-remote="up">↑</button>
-            <button data-remote="left">←</button>
-            <button data-remote="enter" class="primary">OK</button>
-            <button data-remote="right">→</button>
-            <button data-remote="down">↓</button>
-          </div>
-          <div class="button-row">
-            <button data-remote="playpause">재생/일시정지</button>
-            <button data-remote="back">뒤로</button>
-          </div>
+          <div id="analysisBox" class="analysis-box muted">글래스에서 Display URL을 먼저 열고, 여기서 영상을 보내세요. CHZZK Live는 기본 480p 직접 재생으로 보냅니다.</div>
         </div>
 
         <div class="panel library-panel">
           <div class="section-header">
             <strong>최근 / 즐겨찾기</strong>
-            <span>localStorage</span>
+            <button id="sampleBtnInline" class="small-button">샘플</button>
           </div>
           <div id="phoneList" class="list compact"></div>
         </div>
+
+        <details class="panel launch-panel">
+          <summary>글래스 연결 URL / QR</summary>
+          <input id="launchUrl" readonly placeholder="영상 URL을 넣으면 생성됩니다" />
+          <div class="button-row">
+            <button id="copyLaunchBtn" class="primary">Launch URL 복사</button>
+            <button id="openLaunchBtn">이 기기에서 미리보기</button>
+          </div>
+          <div id="qrBox" class="qr-box">QR</div>
+          <p class="hint">처음 1회만 글래스에서 Display URL을 열어두면 이후에는 이 폰에서 송출/제어합니다.</p>
+        </details>
       </div>
     </section>
 
@@ -101,6 +95,6 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js"></script>
-  <script src="./app.js?v=chzzk3"></script>
+  <script src="./app.js?v=phone-control1"></script>
 </body>
 </html>

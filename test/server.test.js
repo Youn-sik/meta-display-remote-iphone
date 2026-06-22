@@ -36,6 +36,24 @@ function listen(server) {
   });
 }
 
+async function readSseEvent(responsePromise, eventName) {
+  const response = await responsePromise;
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const match = buffer.match(new RegExp(`event: ${eventName}\\ndata: (.+?)\\n\\n`, 's'));
+    if (match) {
+      await reader.cancel();
+      return JSON.parse(match[1]);
+    }
+  }
+  throw new Error(`missing ${eventName} event`);
+}
+
 test('sanitizeRoom keeps only safe room characters', () => {
   assert.equal(sanitizeRoom(' team-1_room '), 'team-1_room');
   assert.equal(sanitizeRoom('../../bad room'), 'badroom');
@@ -88,27 +106,7 @@ test('POST /api/push delivers play event to SSE display client', async (t) => {
   t.after(() => server.close());
 
   const room = `testroom_${Date.now()}`;
-  const received = new Promise((resolve, reject) => {
-    const req = fetch(`http://127.0.0.1:${port}/api/events?room=${room}`);
-    req.then(async (response) => {
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      const timer = setTimeout(() => reject(new Error('timeout waiting for play event')), 2500);
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const match = buffer.match(/event: play\ndata: (.+?)\n\n/s);
-        if (match) {
-          clearTimeout(timer);
-          await reader.cancel();
-          resolve(JSON.parse(match[1]));
-          break;
-        }
-      }
-    }).catch(reject);
-  });
+  const received = readSseEvent(fetch(`http://127.0.0.1:${port}/api/events?room=${room}`), 'play');
 
   await new Promise((resolve) => setTimeout(resolve, 100));
   const videoUrl = 'https://www.youtube.com/watch?v=aqz-KE-bpKQ';
@@ -136,4 +134,27 @@ test('POST /api/push delivers play event to SSE display client', async (t) => {
   assert.equal(event.url, videoUrl);
   assert.equal(event.room, room);
   assert.equal(event.id, result.message.id);
+});
+
+test('POST /api/control delivers control event to SSE display client', async (t) => {
+  const server = createServer();
+  const port = await listen(server);
+  t.after(() => server.close());
+
+  const room = `control_${Date.now()}`;
+  const received = readSseEvent(fetch(`http://127.0.0.1:${port}/api/events?room=${room}`), 'control');
+
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const response = await fetch(`http://127.0.0.1:${port}/api/control`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ room, action: 'quality:480p' }),
+  });
+  const result = await response.json();
+  assert.equal(result.ok, true);
+  assert.equal(result.delivered, 1);
+
+  const event = await received;
+  assert.equal(event.action, 'quality:480p');
+  assert.equal(event.room, room);
 });

@@ -45,6 +45,13 @@ p { color: var(--muted); line-height: 1.42; }
 .item-title { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item-meta { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item-badge { color: var(--accent); font-size: 11px; font-weight: 900; letter-spacing: 0.08em; }
+.phone-stack { height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 12px; padding-bottom: 4px; }
+.now-panel { border-color: rgba(117,240,255,0.24); }
+.now-playing { border: 1px solid var(--line); border-radius: 14px; padding: 10px; min-height: 42px; color: var(--text); background: rgba(0,0,0,0.22); font-size: 13px; line-height: 1.35; }
+.control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.control-grid button:first-child { grid-column: span 2; }
+.primary-actions { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin-top: 10px; }
+.small-button { min-height: 34px; padding: 6px 10px; border-radius: 10px; font-size: 12px; flex: 0 0 auto; }
 .phone-grid { height: 100%; overflow: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-bottom: 4px; }
 .input-panel, .library-panel { grid-column: span 2; }
 .button-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
@@ -59,6 +66,11 @@ p { color: var(--muted); line-height: 1.42; }
 .bottom-nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .fallback-card { position: absolute; inset: 0; display: grid; place-items: center; padding: 18px; background: linear-gradient(180deg, rgba(0,0,0,0.7), rgba(0,0,0,0.92)); text-align: center; }
 .fallback-card .button-row { justify-content: center; }
+details.panel { display: block; }
+summary { cursor: pointer; font-weight: 800; color: var(--accent); }
+.app-shell[data-mode="phone"] { padding-bottom: 10px; }
+.app-shell[data-mode="phone"] .bottom-nav { grid-template-columns: 1fr 1fr; }
+.app-shell[data-mode="phone"] #sampleBtn { display: none; }
 .app-shell.chzzk-theater { padding: 0; gap: 0; background: #000; }
 .app-shell.chzzk-theater .topbar,
 .app-shell.chzzk-theater #displayMenu,
@@ -75,10 +87,15 @@ p { color: var(--muted); line-height: 1.42; }
 .error { color: var(--danger); }
 @media (max-width: 560px) {
   body { padding: 0; }
-  .app-shell { width: 100vw; height: 100vh; min-height: 0; border-radius: 0; }
+  .app-shell { width: 100vw; height: 100vh; min-height: 0; border-radius: 0; padding: 12px; gap: 10px; }
+  .topbar { align-items: center; }
+  h1 { font-size: 21px; }
+  .panel { padding: 12px; border-radius: 18px; }
+  textarea { min-height: 86px; }
   .phone-grid { grid-template-columns: 1fr; }
   .input-panel, .library-panel { grid-column: span 1; }
   .player-frame { height: 48vh; }
+  .compact { max-height: 210px; }
 }
 @media (width: 600px) and (height: 600px) {
   body { padding: 0; }
