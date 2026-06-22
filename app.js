@@ -15,8 +15,8 @@ const SAMPLE_ITEMS = [
     favorite: true,
   },
   {
-    title: 'CHZZK Live 샘플 URL 입력용',
-    url: 'https://chzzk.naver.com/live/REPLACE_WITH_CHANNEL_ID',
+    title: 'CHZZK Live 테스트',
+    url: 'https://chzzk.naver.com/live/b1099827eb54bab6771bae5c85e887b7',
     favorite: false,
   },
 ];

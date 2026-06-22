@@ -60,7 +60,9 @@
       <div class="status mono" id="shortYoutubeUrl"></div>
       <label>빈 Display 런처</label>
       <div class="status mono" id="shortDisplayUrl"></div>
-      <p>CHZZK Live는 실제 라이브 URL이 필요하므로 아래 “CHZZK Live 테스트 URL”에 넣은 뒤 생성되는 Display launch URL을 Meta AI 앱에 입력합니다.</p>
+      <label>CHZZK Live 즉시 테스트</label>
+      <div class="status mono" id="shortChzzkUrl"></div>
+      <p>CHZZK Live는 우선 위 짧은 URL로 테스트합니다. 다른 라이브를 보려면 아래 “CHZZK Live 테스트 URL”에 넣은 뒤 생성되는 Display launch URL을 Meta AI 앱에 입력합니다.</p>
     </div>
 
     <div class="card">
@@ -68,7 +70,7 @@
       <label for="youtubeUrl">YouTube 테스트 URL</label>
       <input id="youtubeUrl" value="https://www.youtube.com/watch?v=aqz-KE-bpKQ" />
       <label for="chzzkUrl">CHZZK Live 테스트 URL</label>
-      <input id="chzzkUrl" value="https://chzzk.naver.com/live/REPLACE_WITH_CHANNEL_ID" />
+      <input id="chzzkUrl" value="https://chzzk.naver.com/live/b1099827eb54bab6771bae5c85e887b7" />
       <label>MRBD/글래스에서 열 Display launch URL</label>
       <div class="status mono" id="displayUrlPreview"></div>
       <p>위 주소가 실제로 글래스 브라우저에서 열어야 하는 주소입니다. iPhone에서만 열면 글래스 검증이 아닙니다.</p>
@@ -165,6 +167,7 @@
     $('selfQr').innerHTML = qr(location.href);
     $('shortYoutubeUrl').textContent = shortUrl('./youtube.html');
     $('shortDisplayUrl').textContent = shortUrl('./display.html');
+    $('shortChzzkUrl').textContent = shortUrl('./chzzk.html');
     $('envStatus').innerHTML = `현재 페이지: <span class="mono">${location.href}</span>`;
     renderChecks();
     updatePreview();
