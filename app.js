@@ -119,9 +119,6 @@ function getChzzkQuality() {
 
 function setChzzkQuality(quality) {
   state.chzzkQuality = ['720p', '480p', '360p', '144p'].includes(String(quality).toLowerCase()) ? String(quality).toLowerCase() : '480p';
-  const url = new URL(window.location.href);
-  url.searchParams.set('chzzkQuality', state.chzzkQuality);
-  history.replaceState(null, '', url);
   return state.chzzkQuality;
 }
 
@@ -184,6 +181,11 @@ function makePhoneUrl() {
   base.searchParams.set('mode', 'phone');
   base.searchParams.set('room', state.room);
   return base.href;
+}
+
+function setTheaterMode(active) {
+  $('app').classList.toggle('player-theater', active);
+  document.body.classList.toggle('player-theater', active);
 }
 
 function setMode(mode) {
@@ -357,20 +359,18 @@ function playUrl(raw) {
   updateNowPlaying(`${parsed.title} · ${parsed.provider.toUpperCase()} ${parsed.kind.toUpperCase()}`);
   upsertRecent({ title: parsed.title, url: parsed.url });
   setMode('display');
+  setTheaterMode(false);
   $('app').classList.remove('chzzk-theater');
   const frame = $('playerFrame');
   frame.innerHTML = '';
 
   if (parsed.provider === 'youtube' && parsed.embedUrl) {
-    const iframe = document.createElement('iframe');
-    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
-    iframe.allowFullscreen = true;
-    iframe.src = parsed.embedUrl;
-    frame.appendChild(iframe);
+    playYouTubeTheater(parsed);
     return;
   }
 
   if (parsed.provider === 'chzzk') {
+    setTheaterMode(true);
     $('app').classList.add('chzzk-theater');
     if (parsed.kind === 'live' && getChzzkMode() !== 'official') {
       playChzzkDirect(parsed);
@@ -381,6 +381,19 @@ function playUrl(raw) {
   }
 
   showFallback(parsed, '내장 재생을 지원하지 않는 URL입니다.');
+}
+
+function playYouTubeTheater(parsed) {
+  setTheaterMode(true);
+  const frame = $('playerFrame');
+  frame.innerHTML = '';
+  const iframe = document.createElement('iframe');
+  iframe.className = 'youtube-frame';
+  iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen';
+  iframe.allowFullscreen = true;
+  iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+  iframe.src = parsed.embedUrl;
+  frame.appendChild(iframe);
 }
 
 function playChzzkOfficial(parsed) {
@@ -405,13 +418,16 @@ async function playChzzkDirect(parsed) {
   frame.innerHTML = `
     <div class="chzzk-direct">
       <div id="chzzkStatus" class="chzzk-status">CHZZK ${quality} HLS 직접 재생 준비 중…</div>
-      <video id="chzzkVideo" class="chzzk-video" autoplay playsinline webkit-playsinline disablepictureinpicture></video>
+      <video id="chzzkVideo" class="chzzk-video" autoplay playsinline webkit-playsinline disablepictureinpicture disableremoteplayback controlslist="nodownload nofullscreen noplaybackrate"></video>
       <div id="chzzkOverlay" class="chzzk-overlay"></div>
     </div>
   `;
   const video = $('chzzkVideo');
   video.controls = false;
   video.disablePictureInPicture = true;
+  video.disableRemotePlayback = true;
+  video.addEventListener('click', (event) => event.preventDefault());
+  video.addEventListener('touchstart', (event) => event.preventDefault(), { passive: false });
   const overlay = $('chzzkOverlay');
   const status = $('chzzkStatus');
   const isCurrentRun = () => state.chzzkDirectRunId === runId;
@@ -438,16 +454,16 @@ async function playChzzkDirect(parsed) {
       <div><strong>${result.selected.quality}</strong> · ${result.selected.width}x${result.selected.height} · ${formatMbps(result.selected.bandwidth)}</div>
       <div>${result.title || parsed.title}</div>
       <div class="button-row chzzk-mini-buttons">
-        <button id="chzzkPlayBtn">재생/일시정지</button>
-        <button id="chzzk480Btn">480p</button>
-        <button id="chzzk720Btn">720p</button>
-        <button id="chzzkOfficialBtn">공식 페이지</button>
+        <button id="chzzkPlayBtn" type="button">재생/일시정지</button>
+        <button id="chzzk480Btn" type="button">480p</button>
+        <button id="chzzk720Btn" type="button">720p</button>
+        <button id="chzzkOfficialBtn" type="button">공식 페이지</button>
       </div>
     `;
-    overlay.querySelector('#chzzkPlayBtn').addEventListener('click', () => toggleCurrentVideo());
-    overlay.querySelector('#chzzk480Btn').addEventListener('click', () => switchChzzkQuality('480p'));
-    overlay.querySelector('#chzzk720Btn').addEventListener('click', () => switchChzzkQuality('720p'));
-    overlay.querySelector('#chzzkOfficialBtn').addEventListener('click', () => playChzzkOfficial(parsed));
+    overlay.querySelector('#chzzkPlayBtn').addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); toggleCurrentVideo(); });
+    overlay.querySelector('#chzzk480Btn').addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); switchChzzkQuality('480p'); });
+    overlay.querySelector('#chzzk720Btn').addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); switchChzzkQuality('720p'); });
+    overlay.querySelector('#chzzkOfficialBtn').addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); playChzzkOfficial(parsed); });
 
     if (window.Hls?.isSupported()) {
       const hls = new Hls({
@@ -547,6 +563,7 @@ function showFallback(parsed, reason) {
 function resetPlayer() {
   cleanupChzzkDirectPlayback();
   state.current = null;
+  setTheaterMode(false);
   $('app').classList.remove('chzzk-theater');
   $('playerFrame').innerHTML = `
     <div class="empty-state">
