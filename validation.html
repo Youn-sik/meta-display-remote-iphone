@@ -58,15 +58,20 @@
       <input id="youtubeUrl" value="https://www.youtube.com/watch?v=aqz-KE-bpKQ" />
       <label for="chzzkUrl">CHZZK Live 테스트 URL</label>
       <input id="chzzkUrl" value="https://chzzk.naver.com/live/REPLACE_WITH_CHANNEL_ID" />
+      <label>Display launch URL</label>
+      <div class="status mono" id="displayUrlPreview"></div>
       <div class="row">
-        <button class="primary" id="openYoutubeDisplay">YouTube Display 열기</button>
-        <button id="openChzzkDisplay">CHZZK Live Display 열기</button>
+        <button class="primary" id="copyYoutubeDisplay">YouTube Display URL 복사</button>
+        <button id="copyChzzkDisplay">CHZZK Display URL 복사</button>
+      </div>
+      <div class="row">
+        <button class="primary" id="openYoutubeDisplay">이 기기에서 YouTube Display 열기</button>
+        <button id="openChzzkDisplay">이 기기에서 CHZZK Display 열기</button>
       </div>
       <div class="row">
         <button id="openPhone">Phone Companion 열기</button>
         <button id="copyReport">결과 JSON 복사</button>
       </div>
-      <p class="mono" id="displayUrlPreview"></p>
     </div>
 
     <div class="card">
@@ -160,6 +165,20 @@
     });
     $('openYoutubeDisplay').onclick = () => { save(); location.href = launchUrl($('youtubeUrl').value); };
     $('openChzzkDisplay').onclick = () => { save(); location.href = launchUrl($('chzzkUrl').value); };
+    $('copyYoutubeDisplay').onclick = async () => {
+      const url = launchUrl($('youtubeUrl').value);
+      await navigator.clipboard.writeText(url);
+      $('displayUrlPreview').textContent = url;
+      $('copyYoutubeDisplay').textContent = 'YouTube URL 복사 완료';
+      setTimeout(() => $('copyYoutubeDisplay').textContent = 'YouTube Display URL 복사', 1400);
+    };
+    $('copyChzzkDisplay').onclick = async () => {
+      const url = launchUrl($('chzzkUrl').value);
+      await navigator.clipboard.writeText(url);
+      $('displayUrlPreview').textContent = url;
+      $('copyChzzkDisplay').textContent = 'CHZZK URL 복사 완료';
+      setTimeout(() => $('copyChzzkDisplay').textContent = 'CHZZK Display URL 복사', 1400);
+    };
     $('openPhone').onclick = () => { save(); location.href = phoneUrl(); };
     $('copyReport').onclick = async () => {
       const data = save();
