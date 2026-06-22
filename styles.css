@@ -1,0 +1,75 @@
+:root {
+  --bg: #05070c;
+  --panel: rgba(19, 24, 36, 0.86);
+  --panel-strong: rgba(31, 39, 59, 0.95);
+  --line: rgba(255,255,255,0.1);
+  --text: #f7f9ff;
+  --muted: #96a1b8;
+  --accent: #75f0ff;
+  --accent-2: #8cffb8;
+  --danger: #ff7c9b;
+  --shadow: 0 20px 80px rgba(0,0,0,0.45);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: radial-gradient(circle at 20% 0%, #183057 0%, transparent 32%), radial-gradient(circle at 100% 80%, #173a30 0%, transparent 30%), var(--bg); color: var(--text); }
+body { display: grid; place-items: center; padding: 16px; }
+button, input, textarea { font: inherit; }
+button { border: 1px solid var(--line); background: rgba(255,255,255,0.07); color: var(--text); border-radius: 14px; padding: 12px 14px; cursor: pointer; min-height: 44px; }
+button:hover, button:focus, .item.focused { outline: 2px solid var(--accent); background: rgba(117,240,255,0.14); }
+button.primary { background: linear-gradient(135deg, rgba(117,240,255,0.28), rgba(140,255,184,0.18)); border-color: rgba(117,240,255,0.45); }
+input, textarea { width: 100%; border: 1px solid var(--line); background: rgba(0,0,0,0.32); color: var(--text); border-radius: 14px; padding: 12px; }
+textarea { min-height: 116px; resize: vertical; }
+label { display: block; color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+kbd { background: rgba(255,255,255,0.12); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 8px; padding: 3px 7px; font-size: 12px; }
+.app-shell { width: min(100vw - 32px, 600px); height: min(100vh - 32px, 600px); min-height: 560px; overflow: hidden; position: relative; border: 1px solid rgba(255,255,255,0.14); border-radius: 28px; background: linear-gradient(180deg, rgba(12,16,26,0.96), rgba(5,7,12,0.96)); box-shadow: var(--shadow); padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.eyebrow { color: var(--accent); font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; font-weight: 700; }
+h1 { margin: 4px 0 0; font-size: 24px; line-height: 1.1; }
+h2 { margin: 8px 0; font-size: 24px; line-height: 1.18; }
+p { color: var(--muted); line-height: 1.42; }
+.pill { border: 1px solid rgba(117,240,255,0.34); color: var(--accent); background: rgba(117,240,255,0.08); border-radius: 999px; padding: 7px 10px; font-size: 12px; font-weight: 800; }
+.view { display: none; flex: 1; min-height: 0; }
+.view.active { display: block; }
+.player-frame { height: 300px; border-radius: 22px; overflow: hidden; border: 1px solid var(--line); background: #000; position: relative; }
+.player-frame iframe { width: 100%; height: 100%; border: 0; display: block; background: #000; }
+.empty-state { height: 100%; display: grid; place-items: center; align-content: center; text-align: center; padding: 22px; }
+.logo-mark { width: 56px; height: 56px; display: grid; place-items: center; margin: 0 auto 6px; border-radius: 20px; color: var(--accent-2); background: rgba(140,255,184,0.1); border: 1px solid rgba(140,255,184,0.2); font-size: 30px; }
+.shortcut-row { display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; color: var(--muted); font-size: 12px; margin-top: 12px; }
+.panel { border: 1px solid var(--line); background: var(--panel); border-radius: 20px; padding: 14px; backdrop-filter: blur(16px); }
+.menu-panel { margin-top: 12px; height: 160px; display: flex; flex-direction: column; }
+.section-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.section-header span, .hint, .muted { color: var(--muted); font-size: 12px; }
+.list { overflow: auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.item { border: 1px solid var(--line); border-radius: 14px; padding: 10px; background: rgba(255,255,255,0.045); display: grid; gap: 3px; cursor: pointer; }
+.item-title { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item-meta { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item-badge { color: var(--accent); font-size: 11px; font-weight: 900; letter-spacing: 0.08em; }
+.phone-grid { height: 100%; overflow: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-bottom: 4px; }
+.input-panel, .library-panel { grid-column: span 2; }
+.button-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.button-row > * { flex: 1; }
+.analysis-box { min-height: 48px; margin-top: 10px; border: 1px dashed var(--line); border-radius: 14px; padding: 10px; }
+.qr-box { height: 128px; margin-top: 10px; border-radius: 16px; display: grid; place-items: center; background: white; color: #111; overflow: hidden; }
+.qr-box img { width: 128px; height: 128px; image-rendering: pixelated; }
+.remote-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; align-items: center; }
+.remote-pad button:first-child { grid-column: 2; }
+.remote-pad button:nth-child(5) { grid-column: 2; }
+.compact { max-height: 180px; }
+.bottom-nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.fallback-card { position: absolute; inset: 0; display: grid; place-items: center; padding: 18px; background: linear-gradient(180deg, rgba(0,0,0,0.7), rgba(0,0,0,0.92)); text-align: center; }
+.fallback-card .button-row { justify-content: center; }
+.chzzk-assist { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 3; display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 8px; border: 1px solid var(--line); border-radius: 14px; background: rgba(0,0,0,0.72); backdrop-filter: blur(12px); color: var(--muted); font-size: 12px; }
+.chzzk-assist button { min-height: 34px; padding: 7px 9px; border-radius: 10px; }
+.error { color: var(--danger); }
+@media (max-width: 560px) {
+  body { padding: 0; }
+  .app-shell { width: 100vw; height: 100vh; min-height: 0; border-radius: 0; }
+  .phone-grid { grid-template-columns: 1fr; }
+  .input-panel, .library-panel { grid-column: span 1; }
+  .player-frame { height: 48vh; }
+}
+@media (width: 600px) and (height: 600px) {
+  body { padding: 0; }
+  .app-shell { width: 600px; height: 600px; border-radius: 0; }
+}

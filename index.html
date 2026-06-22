@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <title>Meta Display Remote iPhone</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main id="app" class="app-shell" data-mode="display">
+    <section class="topbar">
+      <div>
+        <div class="eyebrow">Meta Display Remote iPhone</div>
+        <h1 id="screenTitle">안경 디스플레이</h1>
+      </div>
+      <div id="modePill" class="pill">DISPLAY</div>
+    </section>
+
+    <section id="displayView" class="view active" aria-label="MRBD display">
+      <div id="playerFrame" class="player-frame">
+        <div class="empty-state">
+          <div class="logo-mark">◉</div>
+          <h2>폰에서 영상을 골라<br/>안경으로 보내는 런처</h2>
+          <p>Phone Companion에서 YouTube/CHZZK URL을 넣고 Launch URL 또는 QR로 MRBD에서 여세요.</p>
+          <div class="shortcut-row">
+            <kbd>↑↓</kbd><span>목록 이동</span><kbd>Enter</kbd><span>열기</span><kbd>Esc</kbd><span>뒤로</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="displayMenu" class="panel menu-panel">
+        <div class="section-header">
+          <strong>빠른 실행</strong>
+          <span id="connectionState">정적 handoff 모드</span>
+        </div>
+        <div id="displayList" class="list" role="listbox" tabindex="0"></div>
+      </div>
+    </section>
+
+    <section id="phoneView" class="view" aria-label="Phone companion">
+      <div class="phone-grid">
+        <div class="panel input-panel">
+          <label for="urlInput">영상 URL</label>
+          <textarea id="urlInput" placeholder="YouTube, youtu.be, chzzk.naver.com/live URL"></textarea>
+          <div class="button-row">
+            <button id="analyzeBtn" class="primary">분석</button>
+            <button id="saveFavoriteBtn">즐겨찾기 저장</button>
+          </div>
+          <div id="analysisBox" class="analysis-box muted">URL을 넣으면 provider와 MRBD launch URL을 만듭니다.</div>
+        </div>
+
+        <div class="panel launch-panel">
+          <div class="section-header">
+            <strong>MRBD에서 열기</strong>
+            <span>폰 → 안경</span>
+          </div>
+          <input id="launchUrl" readonly placeholder="분석 후 생성됩니다" />
+          <div class="button-row">
+            <button id="copyLaunchBtn" class="primary">Launch URL 복사</button>
+            <button id="openLaunchBtn">이 기기에서 미리보기</button>
+          </div>
+          <div id="qrBox" class="qr-box">QR</div>
+          <p class="hint">실사용 흐름: 폰에서 URL 선택 → Launch URL 복사/공유 → MRBD 브라우저에서 열기. 실시간 리모컨은 작은 relay 서버를 붙이면 확장 가능합니다.</p>
+        </div>
+
+        <div class="panel remote-panel">
+          <div class="section-header">
+            <strong>리모컨 데모</strong>
+            <span>같은 브라우저/탭 간 BroadcastChannel</span>
+          </div>
+          <div class="remote-pad">
+            <button data-remote="up">↑</button>
+            <button data-remote="left">←</button>
+            <button data-remote="enter" class="primary">OK</button>
+            <button data-remote="right">→</button>
+            <button data-remote="down">↓</button>
+          </div>
+          <div class="button-row">
+            <button data-remote="playpause">재생/일시정지</button>
+            <button data-remote="back">뒤로</button>
+          </div>
+        </div>
+
+        <div class="panel library-panel">
+          <div class="section-header">
+            <strong>최근 / 즐겨찾기</strong>
+            <span>localStorage</span>
+          </div>
+          <div id="phoneList" class="list compact"></div>
+        </div>
+      </div>
+    </section>
+
+    <nav class="bottom-nav">
+      <button id="displayModeBtn">Display</button>
+      <button id="phoneModeBtn">Phone</button>
+      <button id="sampleBtn">샘플 채우기</button>
+    </nav>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
