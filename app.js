@@ -136,7 +136,7 @@ function setChzzkQuality(quality) {
 
 function getChzzkMode() {
   const params = new URLSearchParams(window.location.search);
-  return params.get('chzzkMode') || 'direct';
+  return params.get('chzzkMode') || 'official';
 }
 
 function disposeHls() {
@@ -392,10 +392,6 @@ function playUrl(raw) {
   if (parsed.provider === 'chzzk') {
     setTheaterMode(true);
     $('app').classList.add('chzzk-theater');
-    if (parsed.kind === 'live' && getChzzkMode() !== 'official') {
-      playChzzkDirect(parsed);
-      return;
-    }
     playChzzkOfficial(parsed);
     return;
   }
@@ -422,6 +418,8 @@ function playChzzkOfficial(parsed) {
   const frame = $('playerFrame');
   frame.innerHTML = '';
   const iframe = document.createElement('iframe');
+  iframe.id = 'chzzkFrame';
+  iframe.className = 'chzzk-frame';
   iframe.allow = 'autoplay; encrypted-media; fullscreen; picture-in-picture';
   iframe.allowFullscreen = true;
   iframe.referrerPolicy = 'strict-origin-when-cross-origin';
@@ -536,7 +534,8 @@ async function playChzzkDirect(parsed) {
 function switchChzzkQuality(quality) {
   if (state.current?.provider !== 'chzzk') return;
   setChzzkQuality(quality);
-  if (state.current.kind === 'live') playChzzkDirect(state.current);
+  // CHZZK is shown as the official webview. Quality selection belongs to the CHZZK player UI,
+  // so outer 480p/720p controls must not reload or replace the iframe.
 }
 
 function showChzzkDirectFallback(parsed, reason) {
@@ -610,6 +609,7 @@ function toggleCurrentMedia(force) {
     if (force === 'pause') return sendYouTubeCommand('pauseVideo');
     return sendYouTubeCommand('pauseVideo');
   }
+  if (state.current?.provider === 'chzzk') return false;
   const video = $('chzzkVideo');
   if (!video) return false;
   if (force === 'pause' || (!force && !video.paused)) {
@@ -629,7 +629,7 @@ function handleControl(action) {
   if (action === 'quality:480p' && state.current?.provider === 'chzzk') switchChzzkQuality('480p');
   if (action === 'quality:720p' && state.current?.provider === 'chzzk') switchChzzkQuality('720p');
   if (action === 'official' && state.current?.provider === 'chzzk') playChzzkOfficial(state.current);
-  if (action === 'direct' && state.current?.provider === 'chzzk') playChzzkDirect(state.current);
+  if (action === 'direct' && state.current?.provider === 'chzzk') playChzzkOfficial(state.current);
 }
 
 async function sendControl(action) {

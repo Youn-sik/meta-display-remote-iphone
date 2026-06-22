@@ -50,7 +50,8 @@ p { color: var(--muted); line-height: 1.42; }
 .now-panel { border-color: rgba(117,240,255,0.24); }
 .now-playing { border: 1px solid var(--line); border-radius: 14px; padding: 10px; min-height: 42px; color: var(--text); background: rgba(0,0,0,0.22); font-size: 13px; line-height: 1.35; }
 .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-.control-grid button:first-child { grid-column: span 2; }
+.control-grid button { min-width: 0; }
+.control-grid button:first-child { grid-column: auto; }
 .primary-actions { display: grid; grid-template-columns: 2fr 1.4fr 1fr; gap: 8px; margin-top: 10px; }
 .small-button { min-height: 34px; padding: 6px 10px; border-radius: 10px; font-size: 12px; flex: 0 0 auto; }
 .phone-grid { height: 100%; overflow: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-bottom: 4px; }
