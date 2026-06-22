@@ -4,10 +4,17 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Display Launcher</title>
-  <script>location.replace('./index.html?mode=display');</script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    params.set('mode', 'display');
+    location.replace('./index.html?' + params.toString());
+  </script>
 </head>
 <body>
   <p>Opening display launcher…</p>
-  <p><a href="./index.html?mode=display">Open manually</a></p>
+  <p><a id="manual" href="./index.html?mode=display">Open manually</a></p>
+  <script>
+    document.getElementById('manual').href = './index.html?' + new URLSearchParams({ ...Object.fromEntries(new URLSearchParams(location.search)), mode: 'display' }).toString();
+  </script>
 </body>
 </html>

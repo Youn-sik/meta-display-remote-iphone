@@ -1,6 +1,7 @@
 const $ = (id) => document.getElementById(id);
 
 const STORAGE_KEY = 'meta-display-remote-iphone:v1';
+const ROOM_KEY = 'meta-display-remote-iphone:room';
 const channel = 'BroadcastChannel' in window ? new BroadcastChannel('meta-display-remote-iphone') : null;
 
 const SAMPLE_ITEMS = [
@@ -26,7 +27,19 @@ const state = {
   items: [],
   focusIndex: 0,
   current: null,
+  room: 'default',
+  relayReady: false,
+  lastRelayId: 0,
 };
+
+function getInitialRoom() {
+  const params = new URLSearchParams(window.location.search);
+  const fromUrl = params.get('room');
+  const fromStorage = localStorage.getItem(ROOM_KEY);
+  const room = (fromUrl || fromStorage || 'default').trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48) || 'default';
+  localStorage.setItem(ROOM_KEY, room);
+  return room;
+}
 
 function loadState() {
   try {
@@ -99,6 +112,7 @@ function makeLaunchUrl(raw) {
   base.search = '';
   base.hash = '';
   base.searchParams.set('mode', 'display');
+  base.searchParams.set('room', state.room);
   base.searchParams.set('play', raw);
   return base.href;
 }
@@ -108,6 +122,7 @@ function makePhoneUrl() {
   base.search = '';
   base.hash = '';
   base.searchParams.set('mode', 'phone');
+  base.searchParams.set('room', state.room);
   return base.href;
 }
 
@@ -160,7 +175,7 @@ function renderList(container, items, compact = false) {
     `;
     el.querySelector('.item-title').textContent = item.title || parsed.title;
     el.querySelector('.item-meta').textContent = item.url;
-    el.addEventListener('click', () => playUrl(item.url));
+    el.addEventListener('click', () => compact ? sendUrlToDisplay(item.url) : playUrl(item.url));
     el.addEventListener('focus', () => { state.focusIndex = index; renderDisplayList(); });
     container.appendChild(el);
   });
@@ -182,6 +197,21 @@ function renderAll() {
 function showAnalysis(text, isError = false) {
   $('analysisBox').textContent = text;
   $('analysisBox').classList.toggle('error', isError);
+}
+
+function setRelayState(text, isReady = false) {
+  state.relayReady = isReady;
+  const relayState = $('relayState');
+  const connectionState = $('connectionState');
+  if (relayState) relayState.textContent = text;
+  if (connectionState) connectionState.textContent = text;
+}
+
+function playRelayMessage(data) {
+  if (!data?.url || state.mode !== 'display') return;
+  if (data.id && data.id <= state.lastRelayId) return;
+  if (data.id) state.lastRelayId = data.id;
+  playUrl(data.url);
 }
 
 function analyzeInput() {
@@ -215,6 +245,29 @@ async function copyLaunch() {
 function openLaunch() {
   if (!$('launchUrl').value) analyzeInput();
   if ($('launchUrl').value) window.open($('launchUrl').value, '_blank', 'noopener');
+}
+
+async function sendUrlToDisplay(raw = $('urlInput').value.trim()) {
+  const parsed = parseProvider(raw);
+  if (!parsed.url) return showAnalysis('유효한 URL이 아닙니다.', true);
+  upsertRecent({ title: parsed.title, url: parsed.url });
+  renderAll();
+  const launch = makeLaunchUrl(parsed.url);
+  $('launchUrl').value = launch;
+  renderQr(launch);
+  channel?.postMessage({ type: 'play', url: parsed.url });
+  try {
+    const response = await fetch('/api/push', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ room: state.room, url: parsed.url }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || 'relay_failed');
+    showAnalysis(`${parsed.provider.toUpperCase()} 링크를 글래스로 보냈습니다. 연결된 Display: ${result.delivered}`);
+  } catch {
+    showAnalysis('Relay 전송 실패. Display launch URL을 복사해서 Meta AI 앱에 입력하세요.', true);
+  }
 }
 
 function playUrl(raw) {
@@ -257,19 +310,11 @@ function showChzzkAssist(parsed) {
   const bar = document.createElement('div');
   bar.className = 'chzzk-assist';
   bar.innerHTML = `
-    <span>CHZZK 최대화 모드입니다. 필요하면 전체화면을 누르세요.</span>
-    <button id="chzzkFullscreenBtn">전체화면</button>
+    <span>CHZZK 최대화 모드</span>
     <button id="chzzkLauncherBtn">런처</button>
     <button id="chzzkHideBtn">숨김</button>
   `;
   frame.appendChild(bar);
-  bar.querySelector('#chzzkFullscreenBtn').addEventListener('click', async () => {
-    try {
-      await $('app').requestFullscreen?.();
-    } catch {
-      showFallback(parsed, '이 브라우저는 자동 전체화면을 허용하지 않습니다. 아래 버튼으로 공식 페이지를 열 수 있습니다.');
-    }
-  });
   bar.querySelector('#chzzkLauncherBtn').addEventListener('click', resetPlayer);
   bar.querySelector('#chzzkHideBtn').addEventListener('click', () => bar.remove());
 }
@@ -324,6 +369,7 @@ function seedSamples() {
 }
 
 function bootFromParams() {
+  state.room = getInitialRoom();
   const params = new URLSearchParams(window.location.search);
   const mode = params.get('mode') || 'display';
   const play = params.get('play');
@@ -340,6 +386,7 @@ function bindEvents() {
   $('phoneModeBtn').addEventListener('click', () => setMode('phone'));
   $('sampleBtn').addEventListener('click', seedSamples);
   $('analyzeBtn').addEventListener('click', analyzeInput);
+  $('sendDisplayBtn').addEventListener('click', () => sendUrlToDisplay());
   $('saveFavoriteBtn').addEventListener('click', () => saveFavorite($('urlInput').value));
   $('copyLaunchBtn').addEventListener('click', copyLaunch);
   $('openLaunchBtn').addEventListener('click', openLaunch);
@@ -359,10 +406,36 @@ function bindEvents() {
   });
   channel?.addEventListener('message', (event) => {
     if (event.data?.type === 'remote' && state.mode === 'display') handleRemote(event.data.action);
+    if (event.data?.type === 'play' && state.mode === 'display') playUrl(event.data.url);
   });
+}
+
+function connectRelay() {
+  if ('EventSource' in window) {
+    const events = new EventSource(`/api/events?room=${encodeURIComponent(state.room)}`);
+    events.addEventListener('ready', () => setRelayState(`relay 연결됨 · room ${state.room}`, true));
+    events.addEventListener('play', (event) => playRelayMessage(JSON.parse(event.data || '{}')));
+    events.onerror = () => setRelayState(`relay 재연결 중 · room ${state.room}`, false);
+  }
+  window.setInterval(pollLatest, 1000);
+  pollLatest();
+}
+
+async function pollLatest() {
+  try {
+    const response = await fetch(`/api/latest?room=${encodeURIComponent(state.room)}&since=${state.lastRelayId}`, { cache: 'no-store' });
+    const result = await response.json();
+    if (result.ok) {
+      setRelayState(`relay 연결됨 · room ${state.room}`, true);
+      playRelayMessage(result.latest);
+    }
+  } catch {
+    setRelayState(`relay 재연결 중 · room ${state.room}`, false);
+  }
 }
 
 loadState();
 bindEvents();
 bootFromParams();
+connectRelay();
 renderAll();

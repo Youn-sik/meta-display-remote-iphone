@@ -5,11 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>YouTube Display Test</title>
   <script>
-    location.replace('./index.html?mode=display&play=' + encodeURIComponent('https://www.youtube.com/watch?v=aqz-KE-bpKQ'));
+    const params = new URLSearchParams(location.search);
+    params.set('mode', 'display');
+    params.set('play', 'https://www.youtube.com/watch?v=aqz-KE-bpKQ');
+    location.replace('./index.html?' + params.toString());
   </script>
 </head>
 <body>
   <p>Opening YouTube display test…</p>
-  <p><a href="./index.html?mode=display&play=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Daqz-KE-bpKQ">Open manually</a></p>
+  <p><a id="manual" href="./index.html?mode=display&play=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Daqz-KE-bpKQ">Open manually</a></p>
+  <script>
+    const manualParams = new URLSearchParams(location.search);
+    manualParams.set('mode', 'display');
+    manualParams.set('play', 'https://www.youtube.com/watch?v=aqz-KE-bpKQ');
+    document.getElementById('manual').href = './index.html?' + manualParams.toString();
+  </script>
 </body>
 </html>

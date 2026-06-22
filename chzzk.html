@@ -5,11 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CHZZK Live Display Test</title>
   <script>
-    location.replace('./index.html?mode=display&play=' + encodeURIComponent('https://chzzk.naver.com/live/b1099827eb54bab6771bae5c85e887b7'));
+    const params = new URLSearchParams(location.search);
+    params.set('mode', 'display');
+    params.set('play', 'https://chzzk.naver.com/live/b1099827eb54bab6771bae5c85e887b7');
+    location.replace('./index.html?' + params.toString());
   </script>
 </head>
 <body>
   <p>Opening CHZZK live display test…</p>
-  <p><a href="./index.html?mode=display&play=https%3A%2F%2Fchzzk.naver.com%2Flive%2Fb1099827eb54bab6771bae5c85e887b7">Open manually</a></p>
+  <p><a id="manual" href="./index.html?mode=display&play=https%3A%2F%2Fchzzk.naver.com%2Flive%2Fb1099827eb54bab6771bae5c85e887b7">Open manually</a></p>
+  <script>
+    const manualParams = new URLSearchParams(location.search);
+    manualParams.set('mode', 'display');
+    manualParams.set('play', 'https://chzzk.naver.com/live/b1099827eb54bab6771bae5c85e887b7');
+    document.getElementById('manual').href = './index.html?' + manualParams.toString();
+  </script>
 </body>
 </html>

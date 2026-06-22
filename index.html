@@ -44,16 +44,17 @@
           <label for="urlInput">영상 URL</label>
           <textarea id="urlInput" placeholder="YouTube, youtu.be, chzzk.naver.com/live URL"></textarea>
           <div class="button-row">
-            <button id="analyzeBtn" class="primary">분석</button>
+            <button id="sendDisplayBtn" class="primary">글래스로 보내기</button>
+            <button id="analyzeBtn">분석</button>
             <button id="saveFavoriteBtn">즐겨찾기 저장</button>
           </div>
-          <div id="analysisBox" class="analysis-box muted">URL을 넣고 분석을 누르면 아래 “Display launch URL” 칸에 MRBD/글래스에서 열 주소가 생성됩니다.</div>
+          <div id="analysisBox" class="analysis-box muted">URL을 넣고 “글래스로 보내기”를 누르면 같은 room의 Display 화면에서 바로 열립니다.</div>
         </div>
 
         <div class="panel launch-panel">
           <div class="section-header">
-            <strong>Display launch URL — MRBD/글래스에서 열 주소</strong>
-            <span>폰 → 안경</span>
+            <strong>Display 연결</strong>
+            <span id="relayState">relay 확인 중</span>
           </div>
           <input id="launchUrl" readonly placeholder="분석 후 생성됩니다" />
           <div class="button-row">
@@ -61,13 +62,13 @@
             <button id="openLaunchBtn">이 기기에서 미리보기</button>
           </div>
           <div id="qrBox" class="qr-box">QR</div>
-          <p class="hint">실사용 흐름: 폰에서 URL 선택 → Launch URL 복사/공유 → MRBD 브라우저에서 열기. 실시간 리모컨은 작은 relay 서버를 붙이면 확장 가능합니다.</p>
+          <p class="hint">먼저 글래스에서 Display URL을 열어둔 뒤, 폰 Companion에서 YouTube/CHZZK 링크를 보내면 즉시 전환됩니다.</p>
         </div>
 
         <div class="panel remote-panel">
           <div class="section-header">
             <strong>리모컨 데모</strong>
-            <span>같은 브라우저/탭 간 BroadcastChannel</span>
+            <span>relay + 로컬 fallback</span>
           </div>
           <div class="remote-pad">
             <button data-remote="up">↑</button>
