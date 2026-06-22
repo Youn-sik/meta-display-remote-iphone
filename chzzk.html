@@ -7,16 +7,18 @@
   <script>
     const params = new URLSearchParams(location.search);
     params.set('mode', 'display');
+    params.set('chzzkQuality', params.get('quality') || params.get('chzzkQuality') || '480p');
     params.set('play', 'https://chzzk.naver.com/live/b1099827eb54bab6771bae5c85e887b7');
     location.replace('./index.html?' + params.toString());
   </script>
 </head>
 <body>
   <p>Opening CHZZK live display test…</p>
-  <p><a id="manual" href="./index.html?mode=display&play=https%3A%2F%2Fchzzk.naver.com%2Flive%2Fb1099827eb54bab6771bae5c85e887b7">Open manually</a></p>
+  <p><a id="manual" href="./index.html?mode=display&chzzkQuality=480p&play=https%3A%2F%2Fchzzk.naver.com%2Flive%2Fb1099827eb54bab6771bae5c85e887b7">Open manually</a></p>
   <script>
     const manualParams = new URLSearchParams(location.search);
     manualParams.set('mode', 'display');
+    manualParams.set('chzzkQuality', manualParams.get('quality') || manualParams.get('chzzkQuality') || '480p');
     manualParams.set('play', 'https://chzzk.naver.com/live/b1099827eb54bab6771bae5c85e887b7');
     document.getElementById('manual').href = './index.html?' + manualParams.toString();
   </script>

@@ -8,6 +8,9 @@ const clientsByRoom = new Map();
 const latestByRoom = new Map();
 let nextMessageId = 1;
 
+const CHZZK_API_BASE = 'https://api.chzzk.naver.com/service/v3/channels';
+const CHZZK_QUALITIES = ['1080p', '720p', '480p', '360p', '144p'];
+
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -58,6 +61,89 @@ function readBody(req) {
   });
 }
 
+function parseChzzkChannelId(value) {
+  const raw = String(value || '').trim();
+  if (/^[a-zA-Z0-9_-]{16,80}$/.test(raw)) return raw;
+  try {
+    const url = new URL(raw);
+    const parts = url.pathname.split('/').filter(Boolean);
+    const liveIndex = parts.indexOf('live');
+    const channelId = liveIndex >= 0 ? parts[liveIndex + 1] : parts.at(-1);
+    return /^[a-zA-Z0-9_-]{16,80}$/.test(channelId || '') ? channelId : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeChzzkQuality(value) {
+  const quality = String(value || '480p').toLowerCase();
+  return CHZZK_QUALITIES.find((item) => item.toLowerCase() === quality) || '480p';
+}
+
+function selectChzzkVariant(masterText, masterUrl, preferredQuality) {
+  const variants = [];
+  const lines = masterText.split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const info = lines[index];
+    if (!info.startsWith('#EXT-X-STREAM-INF')) continue;
+    const uri = lines.slice(index + 1).find((line) => line && !line.startsWith('#'));
+    if (!uri) continue;
+    const resolution = /RESOLUTION=(\d+)x(\d+)/.exec(info);
+    const bandwidth = /BANDWIDTH=(\d+)/.exec(info);
+    const frameRate = /FRAME-RATE=([\d.]+)/.exec(info);
+    const height = resolution ? Number(resolution[2]) : 0;
+    variants.push({
+      quality: height ? `${height}p` : 'unknown',
+      width: resolution ? Number(resolution[1]) : null,
+      height: height || null,
+      bandwidth: bandwidth ? Number(bandwidth[1]) : null,
+      frameRate: frameRate ? Number(frameRate[1]) : null,
+      url: new URL(uri, masterUrl).href,
+    });
+  }
+  const preferred = variants.find((variant) => variant.quality === preferredQuality);
+  return { variants, selected: preferred || variants[0] || null };
+}
+
+async function fetchChzzkHlsInfo(channelId, preferredQuality) {
+  const detailUrl = `${CHZZK_API_BASE}/${encodeURIComponent(channelId)}/live-detail`;
+  const detailResponse = await fetch(detailUrl, {
+    headers: {
+      accept: 'application/json',
+      'user-agent': 'Mozilla/5.0 (Meta Display Remote iPhone PoC)',
+      referer: `https://chzzk.naver.com/live/${encodeURIComponent(channelId)}`,
+    },
+  });
+  if (!detailResponse.ok) throw new Error(`chzzk_detail_${detailResponse.status}`);
+  const detail = await detailResponse.json();
+  const content = detail.content;
+  if (!content?.livePlaybackJson) throw new Error(detail.message || 'no_live_playback');
+  const playback = JSON.parse(content.livePlaybackJson);
+  const media = playback.media || [];
+  const normalHls = media.find((item) => item.mediaId === 'HLS' && item.path);
+  const fallbackHls = media.find((item) => item.protocol === 'HLS' && item.path);
+  const selectedMedia = normalHls || fallbackHls;
+  if (!selectedMedia?.path) throw new Error('no_hls_media');
+  const masterResponse = await fetch(selectedMedia.path, {
+    headers: { 'user-agent': 'Mozilla/5.0 (Meta Display Remote iPhone PoC)' },
+  });
+  if (!masterResponse.ok) throw new Error(`chzzk_master_${masterResponse.status}`);
+  const masterText = await masterResponse.text();
+  const { variants, selected } = selectChzzkVariant(masterText, selectedMedia.path, preferredQuality);
+  if (!selected) throw new Error('no_hls_variant');
+  return {
+    title: content.liveTitle,
+    status: content.status,
+    channelName: content.channel?.channelName,
+    channelId,
+    mediaId: selectedMedia.mediaId,
+    p2pQuality: content.p2pQuality || [],
+    masterUrl: selectedMedia.path,
+    selected,
+    variants,
+  };
+}
+
 function broadcast(room, event, payload) {
   const clients = clientsByRoom.get(room);
   if (!clients?.size) return 0;
@@ -102,6 +188,22 @@ async function handleApi(req, res, url) {
     const since = Number(url.searchParams.get('since') || 0);
     const latest = latestByRoom.get(room) || null;
     sendJson(res, 200, { ok: true, room, latest: latest && latest.id > since ? latest : null });
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/chzzk/live') {
+    try {
+      const channelId = parseChzzkChannelId(url.searchParams.get('channel') || url.searchParams.get('url'));
+      if (!channelId) {
+        sendJson(res, 400, { ok: false, error: 'invalid_chzzk_channel' });
+        return true;
+      }
+      const quality = normalizeChzzkQuality(url.searchParams.get('quality'));
+      const info = await fetchChzzkHlsInfo(channelId, quality);
+      sendJson(res, 200, { ok: true, requestedQuality: quality, ...info });
+    } catch (error) {
+      sendJson(res, 502, { ok: false, error: error.message || 'chzzk_live_failed' });
+    }
     return true;
   }
 

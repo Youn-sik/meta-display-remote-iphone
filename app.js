@@ -30,6 +30,7 @@ const state = {
   room: 'default',
   relayReady: false,
   lastRelayId: 0,
+  hls: null,
 };
 
 function getInitialRoom() {
@@ -105,6 +106,29 @@ function chzzkCandidateEmbed(url, kind, id) {
   if (kind === 'video') return url.href;
   if (kind === 'live') return `https://chzzk.naver.com/live/${encodeURIComponent(id)}`;
   return url.href;
+}
+
+function getChzzkQuality() {
+  const params = new URLSearchParams(window.location.search);
+  const quality = (params.get('chzzkQuality') || params.get('quality') || '480p').toLowerCase();
+  return ['720p', '480p', '360p', '144p'].includes(quality) ? quality : '480p';
+}
+
+function getChzzkMode() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('chzzkMode') || 'direct';
+}
+
+function disposeHls() {
+  if (state.hls) {
+    state.hls.destroy();
+    state.hls = null;
+  }
+}
+
+function formatMbps(bandwidth) {
+  if (!bandwidth) return '-';
+  return `${(bandwidth / 1_000_000).toFixed(2)} Mbps`;
 }
 
 function makeLaunchUrl(raw) {
@@ -273,6 +297,7 @@ async function sendUrlToDisplay(raw = $('urlInput').value.trim()) {
 function playUrl(raw) {
   const parsed = parseProvider(raw);
   if (!parsed.url) return;
+  disposeHls();
   state.current = parsed;
   upsertRecent({ title: parsed.title, url: parsed.url });
   setMode('display');
@@ -291,16 +316,113 @@ function playUrl(raw) {
 
   if (parsed.provider === 'chzzk') {
     $('app').classList.add('chzzk-theater');
-    const iframe = document.createElement('iframe');
-    iframe.allow = 'autoplay; encrypted-media; fullscreen; picture-in-picture';
-    iframe.allowFullscreen = true;
-    iframe.referrerPolicy = 'strict-origin-when-cross-origin';
-    iframe.src = parsed.embedUrl || parsed.url;
-    frame.appendChild(iframe);
+    if (parsed.kind === 'live' && getChzzkMode() !== 'official') {
+      playChzzkDirect(parsed);
+      return;
+    }
+    playChzzkOfficial(parsed);
     return;
   }
 
   showFallback(parsed, '내장 재생을 지원하지 않는 URL입니다.');
+}
+
+function playChzzkOfficial(parsed) {
+  const frame = $('playerFrame');
+  frame.innerHTML = '';
+  const iframe = document.createElement('iframe');
+  iframe.allow = 'autoplay; encrypted-media; fullscreen; picture-in-picture';
+  iframe.allowFullscreen = true;
+  iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+  iframe.src = parsed.embedUrl || parsed.url;
+  frame.appendChild(iframe);
+}
+
+async function playChzzkDirect(parsed) {
+  const frame = $('playerFrame');
+  const quality = getChzzkQuality();
+  frame.innerHTML = `
+    <div class="chzzk-direct">
+      <div class="chzzk-status">CHZZK ${quality} HLS 직접 재생 준비 중…</div>
+      <video id="chzzkVideo" class="chzzk-video" controls autoplay playsinline></video>
+      <div id="chzzkOverlay" class="chzzk-overlay"></div>
+    </div>
+  `;
+  const video = $('chzzkVideo');
+  const overlay = $('chzzkOverlay');
+  try {
+    const response = await fetch(`/api/chzzk/live?channel=${encodeURIComponent(parsed.url)}&quality=${encodeURIComponent(quality)}`);
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || 'chzzk_hls_failed');
+    const src = result.selected.url;
+    overlay.innerHTML = `
+      <div><strong>${result.selected.quality}</strong> · ${result.selected.width}x${result.selected.height} · ${formatMbps(result.selected.bandwidth)}</div>
+      <div>${result.title || parsed.title}</div>
+      <div class="button-row chzzk-mini-buttons">
+        <button id="chzzk480Btn">480p</button>
+        <button id="chzzk720Btn">720p</button>
+        <button id="chzzkOfficialBtn">공식 페이지</button>
+      </div>
+    `;
+    overlay.querySelector('#chzzk480Btn').addEventListener('click', () => switchChzzkQuality(parsed.url, '480p'));
+    overlay.querySelector('#chzzk720Btn').addEventListener('click', () => switchChzzkQuality(parsed.url, '720p'));
+    overlay.querySelector('#chzzkOfficialBtn').addEventListener('click', () => playChzzkOfficial(parsed));
+
+    if (window.Hls?.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: false,
+        maxBufferLength: 30,
+        backBufferLength: 30,
+      });
+      state.hls = hls;
+      hls.loadSource(src);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (data?.fatal) {
+          overlay.classList.add('error');
+          overlay.insertAdjacentHTML('beforeend', `<div>HLS 오류: ${data.type || ''} ${data.details || ''}</div>`);
+        }
+      });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = src;
+    } else {
+      throw new Error('hls_not_supported');
+    }
+    await video.play().catch(() => {
+      overlay.insertAdjacentHTML('beforeend', '<div>자동재생이 막히면 화면의 재생 버튼을 누르세요.</div>');
+    });
+  } catch (error) {
+    frame.innerHTML = '';
+    showChzzkDirectFallback(parsed, error.message || 'direct_failed');
+  }
+}
+
+function switchChzzkQuality(raw, quality) {
+  const url = new URL(window.location.href);
+  url.searchParams.set('chzzkQuality', quality);
+  history.replaceState(null, '', url);
+  playUrl(raw);
+}
+
+function showChzzkDirectFallback(parsed, reason) {
+  const frame = $('playerFrame');
+  const card = document.createElement('div');
+  card.className = 'fallback-card';
+  card.innerHTML = `
+    <div>
+      <div class="logo-mark">⚠</div>
+      <h2>CHZZK 직접 재생 실패</h2>
+      <p>${reason}</p>
+      <div class="button-row">
+        <button id="retryDirectBtn">직접 재시도</button>
+        <button id="officialBtn" class="primary">공식 페이지</button>
+      </div>
+    </div>
+  `;
+  frame.appendChild(card);
+  card.querySelector('#retryDirectBtn').addEventListener('click', () => playChzzkDirect(parsed));
+  card.querySelector('#officialBtn').addEventListener('click', () => playChzzkOfficial(parsed));
 }
 
 function showFallback(parsed, reason) {
@@ -326,6 +448,7 @@ function showFallback(parsed, reason) {
 }
 
 function resetPlayer() {
+  disposeHls();
   state.current = null;
   $('app').classList.remove('chzzk-theater');
   $('playerFrame').innerHTML = `
