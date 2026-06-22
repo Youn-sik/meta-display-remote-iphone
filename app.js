@@ -223,6 +223,7 @@ function playUrl(raw) {
   state.current = parsed;
   upsertRecent({ title: parsed.title, url: parsed.url });
   setMode('display');
+  $('app').classList.remove('chzzk-theater');
   const frame = $('playerFrame');
   frame.innerHTML = '';
 
@@ -236,6 +237,7 @@ function playUrl(raw) {
   }
 
   if (parsed.provider === 'chzzk') {
+    $('app').classList.add('chzzk-theater');
     const iframe = document.createElement('iframe');
     iframe.allow = 'autoplay; encrypted-media; fullscreen; picture-in-picture';
     iframe.allowFullscreen = true;
@@ -255,12 +257,20 @@ function showChzzkAssist(parsed) {
   const bar = document.createElement('div');
   bar.className = 'chzzk-assist';
   bar.innerHTML = `
-    <span>CHZZK 화면이 비어 있으면 공식 페이지로 여세요.</span>
-    <button id="chzzkFullPageBtn">전체 페이지</button>
+    <span>CHZZK 최대화 모드입니다. 필요하면 전체화면을 누르세요.</span>
+    <button id="chzzkFullscreenBtn">전체화면</button>
+    <button id="chzzkLauncherBtn">런처</button>
     <button id="chzzkHideBtn">숨김</button>
   `;
   frame.appendChild(bar);
-  bar.querySelector('#chzzkFullPageBtn').addEventListener('click', () => { window.location.href = parsed.url; });
+  bar.querySelector('#chzzkFullscreenBtn').addEventListener('click', async () => {
+    try {
+      await $('app').requestFullscreen?.();
+    } catch {
+      showFallback(parsed, '이 브라우저는 자동 전체화면을 허용하지 않습니다. 아래 버튼으로 공식 페이지를 열 수 있습니다.');
+    }
+  });
+  bar.querySelector('#chzzkLauncherBtn').addEventListener('click', resetPlayer);
   bar.querySelector('#chzzkHideBtn').addEventListener('click', () => bar.remove());
 }
 
@@ -288,6 +298,7 @@ function showFallback(parsed, reason) {
 
 function resetPlayer() {
   state.current = null;
+  $('app').classList.remove('chzzk-theater');
   $('playerFrame').innerHTML = `
     <div class="empty-state">
       <div class="logo-mark">◉</div>

@@ -61,6 +61,13 @@ p { color: var(--muted); line-height: 1.42; }
 .fallback-card .button-row { justify-content: center; }
 .chzzk-assist { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 3; display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 8px; border: 1px solid var(--line); border-radius: 14px; background: rgba(0,0,0,0.72); backdrop-filter: blur(12px); color: var(--muted); font-size: 12px; }
 .chzzk-assist button { min-height: 34px; padding: 7px 9px; border-radius: 10px; }
+.app-shell.chzzk-theater { padding: 0; gap: 0; background: #000; }
+.app-shell.chzzk-theater .topbar,
+.app-shell.chzzk-theater #displayMenu,
+.app-shell.chzzk-theater .bottom-nav { display: none; }
+.app-shell.chzzk-theater #displayView { height: 100%; }
+.app-shell.chzzk-theater .player-frame { width: 100%; height: 100%; border: 0; border-radius: 0; }
+.app-shell.chzzk-theater .player-frame iframe { width: 100%; height: 100%; }
 .error { color: var(--danger); }
 @media (max-width: 560px) {
   body { padding: 0; }
