@@ -297,26 +297,10 @@ function playUrl(raw) {
     iframe.referrerPolicy = 'strict-origin-when-cross-origin';
     iframe.src = parsed.embedUrl || parsed.url;
     frame.appendChild(iframe);
-    window.setTimeout(() => showChzzkAssist(parsed), 2400);
     return;
   }
 
   showFallback(parsed, '내장 재생을 지원하지 않는 URL입니다.');
-}
-
-function showChzzkAssist(parsed) {
-  const frame = $('playerFrame');
-  if (frame.querySelector('.chzzk-assist')) return;
-  const bar = document.createElement('div');
-  bar.className = 'chzzk-assist';
-  bar.innerHTML = `
-    <span>CHZZK 최대화 모드</span>
-    <button id="chzzkLauncherBtn">런처</button>
-    <button id="chzzkHideBtn">숨김</button>
-  `;
-  frame.appendChild(bar);
-  bar.querySelector('#chzzkLauncherBtn').addEventListener('click', resetPlayer);
-  bar.querySelector('#chzzkHideBtn').addEventListener('click', () => bar.remove());
 }
 
 function showFallback(parsed, reason) {
