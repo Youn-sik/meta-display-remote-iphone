@@ -46,7 +46,7 @@
       <span class="pill">REAL DEVICE VALIDATION · 1차</span>
       <h1>Meta Display Remote iPhone<br/>실기기 검증</h1>
       <p><strong>이 페이지는 iPhone에서 여는 검증 도구입니다.</strong> 여기서 만들어지는 <strong>Display launch URL</strong>을 MRBD/글래스 브라우저에서 열어야 실제 검증이 됩니다.</p>
-      <p>CHZZK는 클립 제외, Live만 봅니다.</p>
+      <p>CHZZK는 Live/VOD direct video를 우선 봅니다. Clip은 이번 완료 범위에서 제외합니다.</p>
       <div class="status" id="envStatus">환경 확인 중…</div>
     </div>
     <div class="qr" id="selfQr">QR</div>
@@ -62,14 +62,14 @@
       <div class="status mono" id="shortDisplayUrl"></div>
       <label>CHZZK Live 즉시 테스트</label>
       <div class="status mono" id="shortChzzkUrl"></div>
-      <p>CHZZK Live는 우선 위 짧은 URL로 테스트합니다. 다른 라이브를 보려면 아래 “CHZZK Live 테스트 URL”에 넣은 뒤 생성되는 Display launch URL을 Meta AI 앱에 입력합니다.</p>
+      <p>CHZZK Live는 우선 위 짧은 URL로 direct 480p 테스트합니다. 다른 라이브/VOD를 보려면 아래 “CHZZK 테스트 URL”에 넣은 뒤 생성되는 Display launch URL을 Meta AI 앱에 입력합니다.</p>
     </div>
 
     <div class="card">
       <h2>1. 테스트 URL 만들기</h2>
       <label for="youtubeUrl">YouTube 테스트 URL</label>
       <input id="youtubeUrl" value="https://www.youtube.com/watch?v=aqz-KE-bpKQ" />
-      <label for="chzzkUrl">CHZZK Live 테스트 URL</label>
+      <label for="chzzkUrl">CHZZK 테스트 URL (Live 또는 VOD)</label>
       <input id="chzzkUrl" value="https://chzzk.naver.com/live/b1099827eb54bab6771bae5c85e887b7" />
       <label>MRBD/글래스에서 열 Display launch URL</label>
       <div class="status mono" id="displayUrlPreview"></div>
@@ -93,7 +93,7 @@
       <div class="step"><div class="num">1</div><div>iPhone에서 이 페이지 또는 Phone Companion을 연다.</div></div>
       <div class="step"><div class="num">2</div><div>YouTube URL로 Display launch URL을 만든 뒤 MRBD/안경 브라우저에서 연다.</div></div>
       <div class="step"><div class="num">3</div><div>영상 재생 버튼, 전체화면/화면비, 오디오 출력 위치를 확인한다.</div></div>
-      <div class="step"><div class="num">4</div><div>CHZZK Live URL로 같은 테스트를 한다. iframe이 애매하면 “전체 페이지” 버튼을 눌러 본다.</div></div>
+      <div class="step"><div class="num">4</div><div>CHZZK Live/VOD URL로 같은 테스트를 한다. 기본은 direct video 480p ceiling이며, 실패하면 콘텐츠/권한/브라우저 제약으로 기록한다.</div></div>
       <div class="step"><div class="num">5</div><div>아래 체크리스트를 저장/복사해서 다음 구현 여부를 판단한다.</div></div>
     </div>
   </section>
@@ -107,8 +107,8 @@
 
   <section class="card">
     <h2>4. 판정 기준</h2>
-    <p><strong class="ok">GO:</strong> YouTube가 MRBD에서 재생되고, CHZZK Live가 최소 공식 페이지/플레이어까지 진입한다. 이 경우 2번 실시간 리모컨 relay로 진행.</p>
-    <p><strong class="warn">PARTIAL:</strong> YouTube는 되지만 CHZZK Live가 로그인/정책/브라우저 문제로 막힌다. 이 경우 YouTube 중심 개인 앱으로 먼저 완성하고 CHZZK는 full-page fallback만 둔다.</p>
+    <p><strong class="ok">GO:</strong> YouTube가 MRBD에서 재생되고, CHZZK Live/VOD direct video가 최소 하나 이상 실제 재생된다. 이 경우 개인 사용 UX polish만 소폭 진행.</p>
+    <p><strong class="warn">PARTIAL:</strong> YouTube는 되지만 CHZZK가 콘텐츠/권한/브라우저 문제로 막힌다. 이 경우 YouTube 중심 개인 앱으로 먼저 쓰고 CHZZK는 성공한 Live/VOD만 즐겨찾기로 제한한다.</p>
     <p><strong class="bad">NO-GO:</strong> YouTube도 MRBD에서 재생이 불안정하거나 오디오/화면이 사용 불가 수준이다. 이 경우 앱 구현보다 MRBD 브라우저/미디어 제약을 먼저 확인한다.</p>
   </section>
 </main>
@@ -120,11 +120,11 @@
     'MRBD/안경에서 YouTube iframe/player가 보인다',
     'MRBD/안경에서 YouTube 영상이 실제 재생된다',
     'YouTube 오디오 출력 위치를 확인했다',
-    'iPhone에서 CHZZK Live launch URL을 만들 수 있다',
-    'MRBD/안경에서 CHZZK Live 공식 페이지에 진입한다',
-    'CHZZK Live 플레이어 영역이 보인다',
-    'CHZZK Live 영상/오디오가 실제 재생된다',
-    'CHZZK Live가 안 될 때 전체 페이지 fallback이 동작한다',
+    'iPhone에서 CHZZK Live/VOD launch URL을 만들 수 있다',
+    'MRBD/안경에서 CHZZK direct video 로딩 상태가 보인다',
+    'CHZZK Live 또는 VOD가 480p ceiling으로 선택된다',
+    'CHZZK Live/VOD 영상/오디오가 실제 재생된다',
+    'CHZZK 실패 시 콘텐츠/권한/브라우저 제약을 기록했다',
     '방향키/Enter/Esc 조작이 동작한다'
   ];
   const resultKey = 'meta-display-remote-iphone:validation:v1';
