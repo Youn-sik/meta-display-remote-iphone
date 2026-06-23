@@ -147,11 +147,12 @@ function normalizeChzzkQuality(value) {
 }
 
 function selectChzzkVariantFromList(variants, preferredQuality) {
-  const sorted = [...variants].filter((variant) => variant.url).sort((a, b) => (b.height || 0) - (a.height || 0));
+  const sortedHighToLow = [...variants].filter((variant) => variant.url).sort((a, b) => (b.height || 0) - (a.height || 0));
   const preferredHeight = Number(String(preferredQuality || '480p').replace(/p$/i, '')) || 480;
-  const exact = sorted.find((variant) => variant.quality === preferredQuality);
-  const atLeastPreferred = [...sorted].reverse().find((variant) => (variant.height || 0) >= preferredHeight);
-  return exact || atLeastPreferred || sorted[0] || null;
+  const exact = sortedHighToLow.find((variant) => variant.quality === preferredQuality);
+  const notHigherThanPreferred = sortedHighToLow.find((variant) => (variant.height || 0) <= preferredHeight);
+  const lowestHigherFallback = [...sortedHighToLow].reverse().find((variant) => (variant.height || 0) > preferredHeight);
+  return exact || notHigherThanPreferred || lowestHigherFallback || sortedHighToLow[0] || null;
 }
 
 function selectChzzkVariant(masterText, masterUrl, preferredQuality) {

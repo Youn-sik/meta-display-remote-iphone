@@ -157,7 +157,7 @@ test('GET /api/chzzk/live selects requested HLS quality', async (t) => {
 
 
 
-test('GET /api/chzzk/video resolves VOD HLS and falls 480p request back to 720p', async (t) => {
+test('GET /api/chzzk/video keeps VOD fallback at or below requested 480p', async (t) => {
   const originalFetch = global.fetch;
   t.after(() => {
     global.fetch = originalFetch;
@@ -185,9 +185,9 @@ test('GET /api/chzzk/video resolves VOD HLS and falls 480p request back to 720p'
   assert.equal(result.requestedQuality, '480p');
   assert.equal(result.title, 'fixture vod');
   assert.equal(result.duration, 345);
-  assert.equal(result.selected.quality, '720p');
-  assert.equal(result.selected.sourceUrl, 'https://example.test/vod/720.m3u8');
-  assert.equal(result.selected.url, '/api/chzzk/vod-playlist?src=https%3A%2F%2Fexample.test%2Fvod%2F720.m3u8');
+  assert.equal(result.selected.quality, '144p');
+  assert.equal(result.selected.sourceUrl, 'https://example.test/vod/144.m3u8');
+  assert.equal(result.selected.url, '/api/chzzk/vod-playlist?src=https%3A%2F%2Fexample.test%2Fvod%2F144.m3u8');
   assert.deepEqual(result.variants.map((variant) => variant.quality), ['1080p', '144p', '720p']);
 });
 
