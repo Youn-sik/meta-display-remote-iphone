@@ -333,7 +333,7 @@ function collectPlaybackStatus() {
       duration,
       seekableStart: normalizeFiniteNumber(seekable.start),
       seekableEnd: normalizeFiniteNumber(seekable.end),
-      isLive: true,
+      isLive: state.current.kind === 'live',
       canSeek: Boolean(video && seekable.end > seekable.start && currentTime >= seekable.start),
     };
   }
@@ -404,7 +404,7 @@ function renderTimeline(status = state.playbackStatus) {
   if (!state.isSeekingFromPhone) slider.value = String(currentTime);
   current.textContent = status.isLive ? `LIVE -${formatClock(Math.max(0, end - currentTime))}` : formatClock(currentTime);
   duration.textContent = status.isLive ? 'LIVE' : formatClock(durationValue);
-  const quality = status.provider === 'chzzk' && status.title ? ' · 480p' : '';
+  const quality = status.provider === 'chzzk' && status.title ? ' · direct' : '';
   meta.textContent = `${status.provider.toUpperCase()}${quality} · ${status.paused ? '일시정지' : '재생 중'}${canSeek ? ' · 타임라인 이동 가능' : ' · 타임라인 대기 중'}`;
 }
 
@@ -546,7 +546,7 @@ function playUrl(raw) {
   if (parsed.provider === 'chzzk') {
     setTheaterMode(true);
     $('app').classList.add('chzzk-theater');
-    playChzzkDirect480(parsed);
+    playChzzkDirect(parsed);
     return;
   }
 
@@ -582,7 +582,7 @@ function playChzzkOfficial(parsed) {
   frame.appendChild(iframe);
 }
 
-async function playChzzkDirect480(parsed) {
+async function playChzzkDirect(parsed) {
   cleanupEmbeddedPlayback();
   const runId = state.chzzkRunId;
   const controller = new AbortController();
@@ -591,8 +591,8 @@ async function playChzzkDirect480(parsed) {
   frame.innerHTML = `
     <div class="chzzk-direct">
       <video id="chzzkVideo" class="chzzk-video" autoplay playsinline webkit-playsinline disablepictureinpicture disableremoteplayback controlslist="nodownload nofullscreen noplaybackrate"></video>
-      <div id="chzzkStatus" class="chzzk-status">CHZZK 480p 불러오는 중…</div>
-      <div id="chzzkOverlay" class="chzzk-overlay">480p direct video</div>
+      <div id="chzzkStatus" class="chzzk-status">CHZZK direct 불러오는 중…</div>
+      <div id="chzzkOverlay" class="chzzk-overlay">CHZZK direct video</div>
     </div>
   `;
   const video = $('chzzkVideo');
@@ -606,7 +606,7 @@ async function playChzzkDirect480(parsed) {
     if (!isCurrentRun() || !overlay) return;
     const selected = stats.selected;
     const elapsed = (performance.now() - startedAt) / 1000;
-    overlay.textContent = `${message} · ${selected?.quality || '480p'} · ${selected?.width || '-'}x${selected?.height || '-'} · ${formatMbps(selected?.bandwidth)} · wait ${stats.waiting} · ${formatSeconds(elapsed)}`;
+    overlay.textContent = `${message} · ${selected?.quality || 'direct'} · ${selected?.width || '-'}x${selected?.height || '-'} · ${formatMbps(selected?.bandwidth)} · wait ${stats.waiting} · ${formatSeconds(elapsed)}`;
   };
   const setStatus = (message, hidden = false) => {
     if (!isCurrentRun() || !status) return;
@@ -633,7 +633,9 @@ async function playChzzkDirect480(parsed) {
   video.addEventListener('error', () => { stats.errors += 1; setStatus('CHZZK video 오류', false); });
 
   try {
-    const response = await fetch(`/api/chzzk/live?channel=${encodeURIComponent(parsed.url)}&quality=480p&t=${Date.now()}`, {
+    const endpoint = parsed.kind === 'video' ? '/api/chzzk/video' : '/api/chzzk/live';
+    const queryKey = parsed.kind === 'video' ? 'video' : 'channel';
+    const response = await fetch(`${endpoint}?${queryKey}=${encodeURIComponent(parsed.url)}&quality=480p&t=${Date.now()}`, {
       cache: 'no-store',
       signal: controller.signal,
     });
@@ -677,7 +679,7 @@ async function playChzzkDirect480(parsed) {
     }
   } catch (error) {
     if (error.name === 'AbortError' || !isCurrentRun()) return;
-    setStatus(`CHZZK 480p direct 실패: ${error.message || 'unknown'}`, false);
+    setStatus(`CHZZK direct 실패: ${error.message || 'unknown'}`, false);
   } finally {
     if (isCurrentRun()) state.chzzkAbortController = null;
   }

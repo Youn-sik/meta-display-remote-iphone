@@ -22,6 +22,61 @@ const liveDetailFixture = {
   },
 };
 
+
+const vodDetailFixture = {
+  code: 200,
+  message: null,
+  content: {
+    videoNo: 11835187,
+    videoId: 'E31870E0C86CE538BB848BCD56F24A4E0B38',
+    videoTitle: 'fixture vod',
+    duration: 345,
+    adult: false,
+    blindType: null,
+    vodStatus: 'ABR_HLS',
+    inKey: 'fixture-key',
+    channel: { channelName: 'fixture channel' },
+  },
+};
+
+const vodPlaybackFixture = {
+  period: [
+    {
+      adaptationSet: [
+        {
+          mimeType: 'video/mp2t',
+          representation: [
+            {
+              id: 'vod-1080',
+              width: 1920,
+              height: 1080,
+              bandwidth: 8203000,
+              frameRate: '30',
+              otherAttributes: { m3u: 'https://example.test/vod/1080.m3u8' },
+            },
+            {
+              id: 'vod-144',
+              width: 256,
+              height: 144,
+              bandwidth: 173000,
+              frameRate: '30',
+              otherAttributes: { m3u: 'https://example.test/vod/144.m3u8' },
+            },
+            {
+              id: 'vod-720',
+              width: 1280,
+              height: 720,
+              bandwidth: 3202000,
+              frameRate: '30',
+              otherAttributes: { m3u: 'https://example.test/vod/720.m3u8' },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
 const masterPlaylistFixture = `#EXTM3U
 #EXT-X-STREAM-INF:BANDWIDTH=3192000,CODECS="avc1.640028,mp4a.40.2",RESOLUTION=1280x720,FRAME-RATE=60.00
 720p/chunklist.m3u8
@@ -100,6 +155,69 @@ test('GET /api/chzzk/live selects requested HLS quality', async (t) => {
   assert.deepEqual(result.variants.map((variant) => variant.quality), ['720p', '480p', '360p']);
 });
 
+
+
+test('GET /api/chzzk/video resolves VOD HLS and falls 480p request back to 720p', async (t) => {
+  const originalFetch = global.fetch;
+  t.after(() => {
+    global.fetch = originalFetch;
+  });
+  global.fetch = async (url, options) => {
+    const href = String(url);
+    if (href.startsWith('http://127.0.0.1:')) return originalFetch(url, options);
+    if (href.includes('/service/v3/videos/11835187')) {
+      return Response.json(vodDetailFixture);
+    }
+    if (href.includes('/neonplayer/vodplay/v1/playback/E31870E0C86CE538BB848BCD56F24A4E0B38')) {
+      return Response.json(vodPlaybackFixture);
+    }
+    throw new Error(`unexpected fetch ${href}`);
+  };
+
+  const server = createServer();
+  const port = await listen(server);
+  t.after(() => server.close());
+
+  const response = await fetch(`http://127.0.0.1:${port}/api/chzzk/video?video=https%3A%2F%2Fchzzk.naver.com%2Fvideo%2F11835187&quality=480p`);
+  const result = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(result.ok, true);
+  assert.equal(result.requestedQuality, '480p');
+  assert.equal(result.title, 'fixture vod');
+  assert.equal(result.duration, 345);
+  assert.equal(result.selected.quality, '720p');
+  assert.equal(result.selected.sourceUrl, 'https://example.test/vod/720.m3u8');
+  assert.equal(result.selected.url, '/api/chzzk/vod-playlist?src=https%3A%2F%2Fexample.test%2Fvod%2F720.m3u8');
+  assert.deepEqual(result.variants.map((variant) => variant.quality), ['1080p', '144p', '720p']);
+});
+
+
+test('GET /api/chzzk/vod-playlist appends manifest signature query to VOD segments', async (t) => {
+  const originalFetch = global.fetch;
+  t.after(() => {
+    global.fetch = originalFetch;
+  });
+  global.fetch = async (url, options) => {
+    const href = String(url);
+    if (href.startsWith('http://127.0.0.1:')) return originalFetch(url, options);
+    if (href === 'https://b01-kr-naver-vod.pstatic.net/vod/720.m3u8?token=signed') {
+      return new Response('#EXTM3U\n#EXTINF:4,\nseg-000.ts\n#EXTINF:4,\nseg-001.ts?already=1\n#EXT-X-ENDLIST\n', { status: 200 });
+    }
+    throw new Error(`unexpected fetch ${href}`);
+  };
+
+  const server = createServer();
+  const port = await listen(server);
+  t.after(() => server.close());
+
+  const src = encodeURIComponent('https://b01-kr-naver-vod.pstatic.net/vod/720.m3u8?token=signed');
+  const response = await fetch(`http://127.0.0.1:${port}/api/chzzk/vod-playlist?src=${src}`);
+  const text = await response.text();
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type'), /application\/vnd\.apple\.mpegurl/);
+  assert.match(text, /https:\/\/b01-kr-naver-vod\.pstatic\.net\/vod\/seg-000\.ts\?token=signed/);
+  assert.match(text, /https:\/\/b01-kr-naver-vod\.pstatic\.net\/vod\/seg-001\.ts\?already=1/);
+});
 
 test('GET /api/events without sse=1 returns 204 so old EventSource clients stop reconnecting', async (t) => {
   const server = createServer();

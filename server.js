@@ -9,7 +9,9 @@ const latestByRoom = new Map();
 const statusByRoom = new Map();
 let nextMessageId = 1;
 
-const CHZZK_API_BASE = 'https://api.chzzk.naver.com/service/v3/channels';
+const CHZZK_CHANNEL_API_BASE = 'https://api.chzzk.naver.com/service/v3/channels';
+const CHZZK_VIDEO_API_BASE = 'https://api.chzzk.naver.com/service/v3/videos';
+const NAVER_VODPLAY_API_BASE = 'https://apis.naver.com/neonplayer/vodplay/v1/playback';
 const CHZZK_QUALITIES = ['1080p', '720p', '480p', '360p', '144p'];
 
 const MIME_TYPES = {
@@ -47,6 +49,55 @@ function sendJson(res, status, body) {
   res.end(json);
 }
 
+function sendText(res, status, text, contentType = 'text/plain; charset=utf-8') {
+  res.writeHead(status, {
+    'content-type': contentType,
+    'cache-control': 'no-store',
+  });
+  res.end(text);
+}
+
+function isAllowedNaverVodManifest(value) {
+  try {
+    const url = new URL(String(value || ''));
+    return url.protocol === 'https:' && url.hostname.endsWith('naver-vod.pstatic.net') && url.pathname.endsWith('.m3u8');
+  } catch {
+    return false;
+  }
+}
+
+function signedVodPlaylistUrl(vodManifestUrl) {
+  return `/api/chzzk/vod-playlist?src=${encodeURIComponent(vodManifestUrl)}`;
+}
+
+function rewriteVodPlaylist(text, manifestUrl) {
+  const parsed = new URL(manifestUrl);
+  const signature = parsed.search;
+  return text.split(/(\r?\n)/).map((line) => {
+    const trimmed = line.trim();
+    if (!signature || !trimmed || trimmed.startsWith('#')) return line;
+    const absoluteUrl = new URL(trimmed, manifestUrl);
+    if (!absoluteUrl.search) absoluteUrl.search = signature;
+    return absoluteUrl.href;
+  }).join('');
+}
+
+async function serveSignedVodPlaylist(res, src) {
+  if (!isAllowedNaverVodManifest(src)) {
+    sendJson(res, 400, { ok: false, error: 'invalid_vod_manifest' });
+    return;
+  }
+  const response = await fetch(src, {
+    headers: { 'user-agent': 'Mozilla/5.0 (Meta Display Remote iPhone PoC)' },
+  });
+  if (!response.ok) {
+    sendJson(res, 502, { ok: false, error: `vod_manifest_${response.status}` });
+    return;
+  }
+  const text = await response.text();
+  sendText(res, 200, rewriteVodPlaylist(text, src), 'application/vnd.apple.mpegurl; charset=utf-8');
+}
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let body = '';
@@ -76,9 +127,31 @@ function parseChzzkChannelId(value) {
   }
 }
 
+function parseChzzkVideoNo(value) {
+  const raw = String(value || '').trim();
+  if (/^\d{3,20}$/.test(raw)) return raw;
+  try {
+    const url = new URL(raw);
+    const parts = url.pathname.split('/').filter(Boolean);
+    const videoIndex = parts.indexOf('video');
+    const videoNo = videoIndex >= 0 ? parts[videoIndex + 1] : parts.at(-1);
+    return /^\d{3,20}$/.test(videoNo || '') ? videoNo : null;
+  } catch {
+    return null;
+  }
+}
+
 function normalizeChzzkQuality(value) {
   const quality = String(value || '480p').toLowerCase();
   return CHZZK_QUALITIES.find((item) => item.toLowerCase() === quality) || '480p';
+}
+
+function selectChzzkVariantFromList(variants, preferredQuality) {
+  const sorted = [...variants].filter((variant) => variant.url).sort((a, b) => (b.height || 0) - (a.height || 0));
+  const preferredHeight = Number(String(preferredQuality || '480p').replace(/p$/i, '')) || 480;
+  const exact = sorted.find((variant) => variant.quality === preferredQuality);
+  const atLeastPreferred = [...sorted].reverse().find((variant) => (variant.height || 0) >= preferredHeight);
+  return exact || atLeastPreferred || sorted[0] || null;
 }
 
 function selectChzzkVariant(masterText, masterUrl, preferredQuality) {
@@ -107,7 +180,7 @@ function selectChzzkVariant(masterText, masterUrl, preferredQuality) {
 }
 
 async function fetchChzzkHlsInfo(channelId, preferredQuality) {
-  const detailUrl = `${CHZZK_API_BASE}/${encodeURIComponent(channelId)}/live-detail`;
+  const detailUrl = `${CHZZK_CHANNEL_API_BASE}/${encodeURIComponent(channelId)}/live-detail`;
   const detailResponse = await fetch(detailUrl, {
     headers: {
       accept: 'application/json',
@@ -141,6 +214,67 @@ async function fetchChzzkHlsInfo(channelId, preferredQuality) {
     p2pQuality: content.p2pQuality || [],
     masterUrl: selectedMedia.path,
     selected,
+    variants,
+  };
+}
+
+
+async function fetchChzzkVodInfo(videoNo, preferredQuality) {
+  const detailUrl = `${CHZZK_VIDEO_API_BASE}/${encodeURIComponent(videoNo)}`;
+  const detailResponse = await fetch(detailUrl, {
+    headers: {
+      accept: 'application/json',
+      'user-agent': 'Mozilla/5.0 (Meta Display Remote iPhone PoC)',
+      referer: `https://chzzk.naver.com/video/${encodeURIComponent(videoNo)}`,
+    },
+  });
+  if (!detailResponse.ok) throw new Error(`chzzk_video_detail_${detailResponse.status}`);
+  const detail = await detailResponse.json();
+  const content = detail.content;
+  if (!content?.videoId || !content?.inKey) throw new Error(detail.message || 'no_vod_playback_key');
+  if (content.adult && content.userAdultStatus !== 'ADULT') throw new Error('adult_vod_requires_login');
+  if (content.blindType) throw new Error(`blocked_vod_${content.blindType}`);
+  if (content.vodStatus && content.vodStatus !== 'ABR_HLS') throw new Error(`unsupported_vod_status_${content.vodStatus}`);
+
+  const playbackUrl = `${NAVER_VODPLAY_API_BASE}/${encodeURIComponent(content.videoId)}?key=${encodeURIComponent(content.inKey)}`;
+  const playbackResponse = await fetch(playbackUrl, {
+    headers: {
+      accept: 'application/json',
+      'user-agent': 'Mozilla/5.0 (Meta Display Remote iPhone PoC)',
+      referer: `https://chzzk.naver.com/video/${encodeURIComponent(videoNo)}`,
+    },
+  });
+  if (!playbackResponse.ok) throw new Error(`naver_vodplay_${playbackResponse.status}`);
+  const playback = await playbackResponse.json();
+  const variants = [];
+  for (const period of playback.period || []) {
+    for (const adaptation of period.adaptationSet || []) {
+      for (const representation of adaptation.representation || []) {
+        const hlsUrl = representation.otherAttributes?.m3u;
+        if (!hlsUrl) continue;
+        const height = Number(representation.height) || null;
+        variants.push({
+          quality: height ? `${height}p` : 'unknown',
+          width: Number(representation.width) || null,
+          height,
+          bandwidth: Number(representation.bandwidth) || null,
+          frameRate: Number(representation.frameRate) || null,
+          url: hlsUrl,
+        });
+      }
+    }
+  }
+  const selected = selectChzzkVariantFromList(variants, preferredQuality);
+  if (!selected) throw new Error('no_vod_hls_variant');
+  const proxiedSelected = { ...selected, sourceUrl: selected.url, url: signedVodPlaylistUrl(selected.url) };
+  return {
+    title: content.videoTitle,
+    status: content.vodStatus,
+    channelName: content.channel?.channelName,
+    videoNo: String(content.videoNo || videoNo),
+    videoId: content.videoId,
+    duration: Number(content.duration) || 0,
+    selected: proxiedSelected,
     variants,
   };
 }
@@ -227,6 +361,16 @@ async function handleApi(req, res, url) {
     return true;
   }
 
+
+  if (req.method === 'GET' && url.pathname === '/api/chzzk/vod-playlist') {
+    try {
+      await serveSignedVodPlaylist(res, url.searchParams.get('src'));
+    } catch (error) {
+      sendJson(res, 502, { ok: false, error: error.message || 'vod_playlist_failed' });
+    }
+    return true;
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/chzzk/live') {
     try {
       const channelId = parseChzzkChannelId(url.searchParams.get('channel') || url.searchParams.get('url'));
@@ -239,6 +383,23 @@ async function handleApi(req, res, url) {
       sendJson(res, 200, { ok: true, requestedQuality: quality, ...info });
     } catch (error) {
       sendJson(res, 502, { ok: false, error: error.message || 'chzzk_live_failed' });
+    }
+    return true;
+  }
+
+
+  if (req.method === 'GET' && url.pathname === '/api/chzzk/video') {
+    try {
+      const videoNo = parseChzzkVideoNo(url.searchParams.get('video') || url.searchParams.get('url'));
+      if (!videoNo) {
+        sendJson(res, 400, { ok: false, error: 'invalid_chzzk_video' });
+        return true;
+      }
+      const quality = normalizeChzzkQuality(url.searchParams.get('quality'));
+      const info = await fetchChzzkVodInfo(videoNo, quality);
+      sendJson(res, 200, { ok: true, requestedQuality: quality, ...info });
+    } catch (error) {
+      sendJson(res, 502, { ok: false, error: error.message || 'chzzk_video_failed' });
     }
     return true;
   }
