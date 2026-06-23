@@ -34,6 +34,10 @@ const state = {
   chzzkRunId: 0,
   chzzkAbortController: null,
   chzzkStats: null,
+  youtubeStatus: { currentTime: 0, duration: 0, paused: true, title: '', url: '' },
+  playbackStatus: null,
+  isSeekingFromPhone: false,
+  lastStatusPostAt: 0,
 };
 
 function getInitialRoom() {
@@ -156,12 +160,34 @@ function formatMbps(bandwidth) {
   return `${(bandwidth / 1_000_000).toFixed(2)} Mbps`;
 }
 
-function sendYouTubeCommand(func) {
+function sendYouTubeCommand(func, args = []) {
   const iframe = $('youtubeFrame');
   if (!iframe?.contentWindow) return false;
   iframe.dataset.lastCommand = func;
-  iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args: [] }), 'https://www.youtube.com');
+  iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args }), 'https://www.youtube.com');
   return true;
+}
+
+function initializeYouTubeTelemetry() {
+  const iframe = $('youtubeFrame');
+  if (!iframe?.contentWindow) return;
+  iframe.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 'youtubeFrame' }), 'https://www.youtube.com');
+  sendYouTubeCommand('addEventListener', ['onStateChange']);
+}
+
+function handleYouTubeMessage(event) {
+  if (event.origin !== 'https://www.youtube.com') return;
+  let data = event.data;
+  if (typeof data === 'string') {
+    try { data = JSON.parse(data); } catch { return; }
+  }
+  if (!data || data.event !== 'infoDelivery' || !data.info) return;
+  const info = data.info;
+  if (Number.isFinite(info.currentTime)) state.youtubeStatus.currentTime = info.currentTime;
+  if (Number.isFinite(info.duration)) state.youtubeStatus.duration = info.duration;
+  if (Number.isFinite(info.playerState)) state.youtubeStatus.paused = info.playerState !== 1;
+  if (typeof info.videoData?.title === 'string') state.youtubeStatus.title = info.videoData.title;
+  state.youtubeStatus.url = state.current?.url || state.youtubeStatus.url || '';
 }
 
 function makeLaunchUrl(raw) {
@@ -269,11 +295,157 @@ function setRelayState(text, isReady = false) {
   if (connectionState) connectionState.textContent = text;
 }
 
+function normalizeFiniteNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function formatClock(seconds) {
+  const value = Math.max(0, Math.floor(normalizeFiniteNumber(seconds)));
+  const h = Math.floor(value / 3600);
+  const m = Math.floor((value % 3600) / 60);
+  const s = value % 60;
+  if (h) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function getVideoSeekable(video) {
+  if (!video?.seekable?.length) return { start: 0, end: normalizeFiniteNumber(video?.duration) };
+  const last = video.seekable.length - 1;
+  return { start: video.seekable.start(0), end: video.seekable.end(last) };
+}
+
+function collectPlaybackStatus() {
+  if (!state.current) {
+    return { provider: 'none', title: '', url: '', paused: true, currentTime: 0, duration: 0, seekableStart: 0, seekableEnd: 0, isLive: false, canSeek: false };
+  }
+  if (state.current.provider === 'chzzk') {
+    const video = $('chzzkVideo');
+    const seekable = getVideoSeekable(video);
+    const duration = Number.isFinite(video?.duration) ? video.duration : Math.max(0, seekable.end - seekable.start);
+    const currentTime = normalizeFiniteNumber(video?.currentTime);
+    return {
+      provider: 'chzzk',
+      title: state.current.title,
+      url: state.current.url,
+      paused: video ? video.paused : true,
+      currentTime,
+      duration,
+      seekableStart: normalizeFiniteNumber(seekable.start),
+      seekableEnd: normalizeFiniteNumber(seekable.end),
+      isLive: true,
+      canSeek: Boolean(video && seekable.end > seekable.start && currentTime >= seekable.start),
+    };
+  }
+  if (state.current.provider === 'youtube') {
+    return {
+      provider: 'youtube',
+      title: state.youtubeStatus.title || state.current.title,
+      url: state.current.url,
+      paused: Boolean(state.youtubeStatus.paused),
+      currentTime: normalizeFiniteNumber(state.youtubeStatus.currentTime),
+      duration: normalizeFiniteNumber(state.youtubeStatus.duration),
+      seekableStart: 0,
+      seekableEnd: normalizeFiniteNumber(state.youtubeStatus.duration),
+      isLive: state.current.kind === 'live',
+      canSeek: normalizeFiniteNumber(state.youtubeStatus.duration) > 0,
+    };
+  }
+  return { provider: state.current.provider, title: state.current.title, url: state.current.url, paused: true, currentTime: 0, duration: 0, seekableStart: 0, seekableEnd: 0, isLive: false, canSeek: false };
+}
+
+async function postPlaybackStatus(force = false) {
+  if (state.mode !== 'display') return;
+  const now = Date.now();
+  if (!force && now - state.lastStatusPostAt < 900) return;
+  state.lastStatusPostAt = now;
+  const status = collectPlaybackStatus();
+  channel?.postMessage({ type: 'status', status });
+  try {
+    await fetch('/api/status', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ room: state.room, ...status }),
+    });
+  } catch {
+    // Status is best-effort. Control path must not be blocked by telemetry.
+  }
+}
+
+function applyPlaybackStatus(status) {
+  if (!status || state.mode !== 'phone') return;
+  state.playbackStatus = status;
+  updateNowPlaying(status.provider === 'none' ? '아직 송출 중인 영상이 없습니다.' : `${status.title || status.provider} · ${status.provider.toUpperCase()} ${status.paused ? '· 일시정지' : '· 재생 중'}`);
+  renderTimeline(status);
+}
+
+function renderTimeline(status = state.playbackStatus) {
+  const slider = $('timelineSeek');
+  const current = $('timelineCurrent');
+  const duration = $('timelineDuration');
+  const meta = $('timelineMeta');
+  if (!slider || !current || !duration || !meta) return;
+  if (!status || status.provider === 'none') {
+    slider.disabled = true;
+    slider.value = 0;
+    current.textContent = '0:00';
+    duration.textContent = '-:--';
+    meta.textContent = '영상 상태를 기다리는 중…';
+    return;
+  }
+  const start = normalizeFiniteNumber(status.seekableStart);
+  const end = normalizeFiniteNumber(status.seekableEnd, status.duration);
+  const currentTime = normalizeFiniteNumber(status.currentTime);
+  const durationValue = normalizeFiniteNumber(status.duration, Math.max(0, end - start));
+  const canSeek = Boolean(status.canSeek && end > start);
+  slider.disabled = !canSeek;
+  slider.min = String(canSeek ? start : 0);
+  slider.max = String(canSeek ? end : Math.max(1, durationValue || 100));
+  if (!state.isSeekingFromPhone) slider.value = String(currentTime);
+  current.textContent = status.isLive ? `LIVE -${formatClock(Math.max(0, end - currentTime))}` : formatClock(currentTime);
+  duration.textContent = status.isLive ? 'LIVE' : formatClock(durationValue);
+  const quality = status.provider === 'chzzk' && status.title ? ' · 480p' : '';
+  meta.textContent = `${status.provider.toUpperCase()}${quality} · ${status.paused ? '일시정지' : '재생 중'}${canSeek ? ' · 타임라인 이동 가능' : ' · 타임라인 대기 중'}`;
+}
+
+async function pollPlaybackStatus() {
+  if (state.mode !== 'phone') return;
+  try {
+    const response = await fetch(`/api/status?room=${encodeURIComponent(state.room)}`, { cache: 'no-store' });
+    const result = await response.json();
+    if (result.ok) applyPlaybackStatus(result.status);
+  } catch {
+    renderTimeline(state.playbackStatus);
+  }
+}
+
+function seekCurrentMedia(seconds) {
+  const target = normalizeFiniteNumber(seconds);
+  if (state.current?.provider === 'youtube') return sendYouTubeCommand('seekTo', [target, true]);
+  if (state.current?.provider === 'chzzk') {
+    const video = $('chzzkVideo');
+    if (!video) return false;
+    const seekable = getVideoSeekable(video);
+    const clamped = Math.min(Math.max(target, seekable.start || 0), seekable.end || target);
+    try {
+      video.currentTime = clamped;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
 function playRelayMessage(data) {
-  if (!data?.url || state.mode !== 'display') return;
+  if (!data || state.mode !== 'display') return;
   if (data.id && data.id <= state.lastRelayId) return;
   if (data.id) state.lastRelayId = data.id;
-  playUrl(data.url);
+  if (data.type === 'control' || data.action) {
+    handleControl(data.action);
+    return;
+  }
+  if (data.url) playUrl(data.url);
 }
 
 function updateNowPlaying(text) {
@@ -356,6 +528,8 @@ function playUrl(raw) {
   if (!parsed.url) return;
   cleanupEmbeddedPlayback();
   state.current = parsed;
+  state.youtubeStatus = { currentTime: 0, duration: 0, paused: true, title: parsed.title, url: parsed.url };
+  postPlaybackStatus(true);
   updateNowPlaying(`${parsed.title} · ${parsed.provider.toUpperCase()} ${parsed.kind.toUpperCase()}`);
   upsertRecent({ title: parsed.title, url: parsed.url });
   setMode('display');
@@ -391,6 +565,7 @@ function playYouTubeTheater(parsed) {
   iframe.referrerPolicy = 'strict-origin-when-cross-origin';
   iframe.src = parsed.embedUrl;
   frame.appendChild(iframe);
+  iframe.addEventListener('load', () => setTimeout(initializeYouTubeTelemetry, 300));
 }
 
 function playChzzkOfficial(parsed) {
@@ -444,6 +619,9 @@ async function playChzzkDirect480(parsed) {
   video.disablePictureInPicture = true;
   video.disableRemotePlayback = true;
   video.addEventListener('click', () => toggleCurrentMedia());
+  ['loadedmetadata', 'durationchange', 'timeupdate', 'play', 'pause', 'playing', 'waiting', 'stalled', 'seeked'].forEach((eventName) => {
+    video.addEventListener(eventName, () => postPlaybackStatus(eventName !== 'timeupdate'));
+  });
   video.addEventListener('loadedmetadata', () => setStatus('메타데이터 로드됨', false));
   video.addEventListener('canplay', () => setStatus(video.paused ? '화면을 눌러 재생하세요.' : '재생 가능', false));
   video.addEventListener('playing', () => {
@@ -530,6 +708,8 @@ function showFallback(parsed, reason) {
 function resetPlayer() {
   cleanupEmbeddedPlayback();
   state.current = null;
+  state.youtubeStatus = { currentTime: 0, duration: 0, paused: true, title: '', url: '' };
+  postPlaybackStatus(true);
   setTheaterMode(false);
   $('app').classList.remove('chzzk-theater');
   $('playerFrame').innerHTML = `
@@ -554,7 +734,7 @@ function toggleCurrentMedia(force) {
   if (state.current?.provider === 'youtube') {
     if (force === 'play') return sendYouTubeCommand('playVideo');
     if (force === 'pause') return sendYouTubeCommand('pauseVideo');
-    return sendYouTubeCommand('pauseVideo');
+    return sendYouTubeCommand(state.youtubeStatus.paused ? 'playVideo' : 'pauseVideo');
   }
   if (state.current?.provider === 'chzzk') {
     const video = $('chzzkVideo');
@@ -579,6 +759,8 @@ function handleControl(action) {
   if (action === 'play') toggleCurrentMedia('play');
   if (action === 'pause') toggleCurrentMedia('pause');
   if (action === 'back') resetPlayer();
+  if (action.startsWith('seek:')) seekCurrentMedia(action.slice(5));
+  postPlaybackStatus(true);
 }
 
 async function sendControl(action) {
@@ -630,6 +812,16 @@ function bindEvents() {
   document.querySelectorAll('[data-control]').forEach((button) => {
     button.addEventListener('click', () => sendControl(button.dataset.control));
   });
+  const timeline = $('timelineSeek');
+  timeline?.addEventListener('input', () => {
+    state.isSeekingFromPhone = true;
+    const current = $('timelineCurrent');
+    if (current) current.textContent = formatClock(timeline.value);
+  });
+  timeline?.addEventListener('change', () => {
+    state.isSeekingFromPhone = false;
+    sendControl(`seek:${Number(timeline.value).toFixed(2)}`);
+  });
   document.querySelectorAll('[data-remote]').forEach((button) => {
     button.addEventListener('click', () => {
       const action = button.dataset.remote;
@@ -644,10 +836,12 @@ function bindEvents() {
     event.preventDefault();
     handleRemote(map[event.key]);
   });
+  window.addEventListener('message', handleYouTubeMessage);
   channel?.addEventListener('message', (event) => {
     if (event.data?.type === 'remote' && state.mode === 'display') handleRemote(event.data.action);
     if (event.data?.type === 'control' && state.mode === 'display') handleControl(event.data.action);
     if (event.data?.type === 'play' && state.mode === 'display') playUrl(event.data.url);
+    if (event.data?.type === 'status' && state.mode === 'phone') applyPlaybackStatus(event.data.status);
   });
 }
 
@@ -659,10 +853,16 @@ function connectRelay() {
     events.addEventListener('control', (event) => {
       if (state.mode === 'display') handleControl(JSON.parse(event.data || '{}').action);
     });
+    events.addEventListener('status', (event) => {
+      if (state.mode === 'phone') applyPlaybackStatus(JSON.parse(event.data || '{}'));
+    });
     events.onerror = () => setRelayState(`relay 재연결 중 · room ${state.room}`, false);
   }
   window.setInterval(pollLatest, 1000);
+  window.setInterval(() => postPlaybackStatus(false), 1000);
+  window.setInterval(pollPlaybackStatus, 1000);
   pollLatest();
+  pollPlaybackStatus();
 }
 
 async function pollLatest() {

@@ -136,7 +136,7 @@ test('POST /api/push delivers play event to SSE display client', async (t) => {
   assert.equal(event.id, result.message.id);
 });
 
-test('POST /api/control delivers control event to SSE display client', async (t) => {
+test('POST /api/control is available through SSE and polling latest', async (t) => {
   const server = createServer();
   const port = await listen(server);
   t.after(() => server.close());
@@ -148,13 +148,65 @@ test('POST /api/control delivers control event to SSE display client', async (t)
   const response = await fetch(`http://127.0.0.1:${port}/api/control`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ room, action: 'quality:480p' }),
+    body: JSON.stringify({ room, action: 'seek:30.5' }),
   });
   const result = await response.json();
   assert.equal(result.ok, true);
   assert.equal(result.delivered, 1);
 
   const event = await received;
-  assert.equal(event.action, 'quality:480p');
+  assert.equal(event.action, 'seek:30.5');
+  assert.equal(event.type, 'control');
   assert.equal(event.room, room);
+
+  const latestResponse = await fetch(`http://127.0.0.1:${port}/api/latest?room=${room}&since=0`);
+  const latestResult = await latestResponse.json();
+  assert.equal(latestResult.ok, true);
+  assert.equal(latestResult.latest.action, 'seek:30.5');
+  assert.equal(latestResult.latest.type, 'control');
+  assert.equal(latestResult.latest.id, result.message.id);
+});
+
+test('POST /api/status stores playback timeline status and broadcasts it', async (t) => {
+  const server = createServer();
+  const port = await listen(server);
+  t.after(() => server.close());
+
+  const room = `status_${Date.now()}`;
+  const received = readSseEvent(fetch(`http://127.0.0.1:${port}/api/events?room=${room}`), 'status');
+
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const response = await fetch(`http://127.0.0.1:${port}/api/status`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      room,
+      provider: 'youtube',
+      title: 'fixture video',
+      url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ',
+      paused: false,
+      currentTime: 42.25,
+      duration: 635,
+      seekableStart: 0,
+      seekableEnd: 635,
+      isLive: false,
+      canSeek: true,
+    }),
+  });
+  const result = await response.json();
+  assert.equal(result.ok, true);
+  assert.equal(result.status.provider, 'youtube');
+  assert.equal(result.status.currentTime, 42.25);
+  assert.equal(result.status.canSeek, true);
+
+  const latestResponse = await fetch(`http://127.0.0.1:${port}/api/status?room=${room}`);
+  const latestResult = await latestResponse.json();
+  assert.equal(latestResult.ok, true);
+  assert.equal(latestResult.status.title, 'fixture video');
+  assert.equal(latestResult.status.seekableEnd, 635);
+
+  const event = await received;
+  assert.equal(event.room, room);
+  assert.equal(event.title, 'fixture video');
+  assert.equal(event.paused, false);
 });

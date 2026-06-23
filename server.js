@@ -6,6 +6,7 @@ const PUBLIC_DIR = __dirname;
 const DEFAULT_PORT = Number(process.env.PORT || 5173);
 const clientsByRoom = new Map();
 const latestByRoom = new Map();
+const statusByRoom = new Map();
 let nextMessageId = 1;
 
 const CHZZK_API_BASE = 'https://api.chzzk.naver.com/service/v3/channels';
@@ -179,7 +180,7 @@ function safeStaticPath(urlPathname) {
 
 async function handleApi(req, res, url) {
   if (req.method === 'GET' && url.pathname === '/api/health') {
-    sendJson(res, 200, { ok: true, rooms: [...new Set([...clientsByRoom.keys(), ...latestByRoom.keys()])] });
+    sendJson(res, 200, { ok: true, rooms: [...new Set([...clientsByRoom.keys(), ...latestByRoom.keys(), ...statusByRoom.keys()])] });
     return true;
   }
 
@@ -188,6 +189,41 @@ async function handleApi(req, res, url) {
     const since = Number(url.searchParams.get('since') || 0);
     const latest = latestByRoom.get(room) || null;
     sendJson(res, 200, { ok: true, room, latest: latest && latest.id > since ? latest : null });
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/status') {
+    const room = sanitizeRoom(url.searchParams.get('room'));
+    sendJson(res, 200, { ok: true, room, status: statusByRoom.get(room) || null });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/status') {
+    try {
+      const raw = await readBody(req);
+      const payload = JSON.parse(raw || '{}');
+      const room = sanitizeRoom(payload.room);
+      const status = {
+        id: nextMessageId++,
+        room,
+        provider: String(payload.provider || 'none').slice(0, 24),
+        title: String(payload.title || '').slice(0, 160),
+        url: String(payload.url || '').slice(0, 2048),
+        paused: Boolean(payload.paused),
+        currentTime: Number.isFinite(Number(payload.currentTime)) ? Number(payload.currentTime) : 0,
+        duration: Number.isFinite(Number(payload.duration)) ? Number(payload.duration) : 0,
+        seekableStart: Number.isFinite(Number(payload.seekableStart)) ? Number(payload.seekableStart) : 0,
+        seekableEnd: Number.isFinite(Number(payload.seekableEnd)) ? Number(payload.seekableEnd) : 0,
+        isLive: Boolean(payload.isLive),
+        canSeek: Boolean(payload.canSeek),
+        at: new Date().toISOString(),
+      };
+      statusByRoom.set(room, status);
+      broadcast(room, 'status', status);
+      sendJson(res, 200, { ok: true, room, status });
+    } catch (error) {
+      sendJson(res, 400, { ok: false, error: error.message || 'bad_request' });
+    }
     return true;
   }
 
@@ -241,11 +277,13 @@ async function handleApi(req, res, url) {
       const room = sanitizeRoom(payload.room);
       const action = String(payload.action || '').trim();
       const allowed = new Set(['playpause', 'play', 'pause', 'back', 'quality:480p', 'quality:720p', 'official', 'direct']);
-      if (!allowed.has(action)) {
+      const isSeek = /^seek:\d+(?:\.\d+)?$/.test(action);
+      if (!allowed.has(action) && !isSeek) {
         sendJson(res, 400, { ok: false, error: 'invalid_action' });
         return true;
       }
-      const message = { id: nextMessageId++, action, room, at: new Date().toISOString() };
+      const message = { id: nextMessageId++, type: 'control', action, room, at: new Date().toISOString() };
+      latestByRoom.set(room, message);
       const delivered = broadcast(room, 'control', message);
       sendJson(res, 200, { ok: true, room, delivered, message });
     } catch (error) {
@@ -294,4 +332,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createServer, sanitizeRoom, isAllowedUrl, broadcast, clientsByRoom, latestByRoom };
+module.exports = { createServer, sanitizeRoom, isAllowedUrl, broadcast, clientsByRoom, latestByRoom, statusByRoom };

@@ -49,6 +49,10 @@ p { color: var(--muted); line-height: 1.42; }
 .phone-stack { height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 12px; padding-bottom: 4px; }
 .now-panel { border-color: rgba(117,240,255,0.24); }
 .now-playing { border: 1px solid var(--line); border-radius: 14px; padding: 10px; min-height: 42px; color: var(--text); background: rgba(0,0,0,0.22); font-size: 13px; line-height: 1.35; }
+.timeline-panel { margin-top: 10px; border: 1px solid var(--line); border-radius: 14px; padding: 10px; background: rgba(0,0,0,0.22); }
+.timeline-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.timeline-row input[type="range"] { padding: 0; accent-color: var(--accent); }
+.timeline-meta { margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
 .control-grid button { min-width: 0; }
 .control-grid button:first-child { grid-column: auto; }
