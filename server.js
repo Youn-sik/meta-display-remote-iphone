@@ -244,6 +244,11 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === 'GET' && url.pathname === '/api/events') {
+    if (url.searchParams.get('sse') !== '1') {
+      res.writeHead(204, { 'cache-control': 'no-store' });
+      res.end();
+      return true;
+    }
     const room = sanitizeRoom(url.searchParams.get('room'));
     const remove = addSseClient(room, res);
     req.on('close', remove);

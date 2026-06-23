@@ -846,9 +846,10 @@ function bindEvents() {
 }
 
 function connectRelay() {
-  if ('EventSource' in window) {
-    const events = new EventSource(`/api/events?room=${encodeURIComponent(state.room)}`);
-    events.addEventListener('ready', () => setRelayState(`relay 연결됨 · room ${state.room}`, true));
+  const useSse = new URLSearchParams(window.location.search).get('sse') === '1';
+  if (useSse && 'EventSource' in window) {
+    const events = new EventSource(`/api/events?room=${encodeURIComponent(state.room)}&sse=1`);
+    events.addEventListener('ready', () => setRelayState(`relay 연결됨 · SSE+polling · room ${state.room}`, true));
     events.addEventListener('play', (event) => playRelayMessage(JSON.parse(event.data || '{}')));
     events.addEventListener('control', (event) => {
       if (state.mode === 'display') handleControl(JSON.parse(event.data || '{}').action);
@@ -856,8 +857,9 @@ function connectRelay() {
     events.addEventListener('status', (event) => {
       if (state.mode === 'phone') applyPlaybackStatus(JSON.parse(event.data || '{}'));
     });
-    events.onerror = () => setRelayState(`relay 재연결 중 · room ${state.room}`, false);
+    events.onerror = () => setRelayState(`relay SSE 재연결 중 · polling 유지 · room ${state.room}`, false);
   }
+  setRelayState(`relay 연결됨 · polling · room ${state.room}`, true);
   window.setInterval(pollLatest, 1000);
   window.setInterval(() => postPlaybackStatus(false), 1000);
   window.setInterval(pollPlaybackStatus, 1000);
@@ -870,7 +872,7 @@ async function pollLatest() {
     const response = await fetch(`/api/latest?room=${encodeURIComponent(state.room)}&since=${state.lastRelayId}`, { cache: 'no-store' });
     const result = await response.json();
     if (result.ok) {
-      setRelayState(`relay 연결됨 · room ${state.room}`, true);
+      setRelayState(`relay 연결됨 · polling · room ${state.room}`, true);
       playRelayMessage(result.latest);
     }
   } catch {
@@ -881,5 +883,5 @@ async function pollLatest() {
 loadState();
 bindEvents();
 bootFromParams();
-connectRelay();
 renderAll();
+connectRelay();

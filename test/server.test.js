@@ -100,13 +100,23 @@ test('GET /api/chzzk/live selects requested HLS quality', async (t) => {
   assert.deepEqual(result.variants.map((variant) => variant.quality), ['720p', '480p', '360p']);
 });
 
+
+test('GET /api/events without sse=1 returns 204 so old EventSource clients stop reconnecting', async (t) => {
+  const server = createServer();
+  const port = await listen(server);
+  t.after(() => server.close());
+
+  const response = await fetch(`http://127.0.0.1:${port}/api/events?room=legacy`);
+  assert.equal(response.status, 204);
+});
+
 test('POST /api/push delivers play event to SSE display client', async (t) => {
   const server = createServer();
   const port = await listen(server);
   t.after(() => server.close());
 
   const room = `testroom_${Date.now()}`;
-  const received = readSseEvent(fetch(`http://127.0.0.1:${port}/api/events?room=${room}`), 'play');
+  const received = readSseEvent(fetch(`http://127.0.0.1:${port}/api/events?room=${room}&sse=1`), 'play');
 
   await new Promise((resolve) => setTimeout(resolve, 100));
   const videoUrl = 'https://www.youtube.com/watch?v=aqz-KE-bpKQ';
@@ -142,7 +152,7 @@ test('POST /api/control is available through SSE and polling latest', async (t) 
   t.after(() => server.close());
 
   const room = `control_${Date.now()}`;
-  const received = readSseEvent(fetch(`http://127.0.0.1:${port}/api/events?room=${room}`), 'control');
+  const received = readSseEvent(fetch(`http://127.0.0.1:${port}/api/events?room=${room}&sse=1`), 'control');
 
   await new Promise((resolve) => setTimeout(resolve, 100));
   const response = await fetch(`http://127.0.0.1:${port}/api/control`, {
@@ -173,7 +183,7 @@ test('POST /api/status stores playback timeline status and broadcasts it', async
   t.after(() => server.close());
 
   const room = `status_${Date.now()}`;
-  const received = readSseEvent(fetch(`http://127.0.0.1:${port}/api/events?room=${room}`), 'status');
+  const received = readSseEvent(fetch(`http://127.0.0.1:${port}/api/events?room=${room}&sse=1`), 'status');
 
   await new Promise((resolve) => setTimeout(resolve, 100));
   const response = await fetch(`http://127.0.0.1:${port}/api/status`, {
